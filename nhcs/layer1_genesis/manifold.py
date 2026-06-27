@@ -105,17 +105,32 @@ class DynamicEmbeddingManifold:
     def nearest_neighbour(
         self, concept_id: str, n: int = 5
     ) -> list[tuple[str, float]]:
-        """Return the n closest embedded concepts (excluding self)."""
+        """Return the n closest embedded concepts (excluding self).
+
+        Distances are computed in a single batched pass: the query embedding is
+        converted to a tensor once, and all candidates are stacked into one
+        ``(K, dim)`` tensor compared via a single broadcast ``self._ball.dist``
+        call — avoiding the per-candidate ``torch.tensor`` re-allocation of the
+        previous loop-with-``distance()`` approach.
+        """
         if concept_id not in self._embeddings:
             return []
-        results = []
-        for cid, coords in self._embeddings.items():
-            if cid == concept_id:
-                continue
-            if _GEOOPT_AVAILABLE:
-                d = self.distance(concept_id, cid)
-            else:
-                d = float(np.linalg.norm(self._embeddings[concept_id] - coords))
-            results.append((cid, d))
-        results.sort(key=lambda x: x[1])
+
+        others = [(cid, c) for cid, c in self._embeddings.items() if cid != concept_id]
+        if not others:
+            return []
+
+        ids = [cid for cid, _ in others]
+        candidates = np.stack([c for _, c in others])          # (K, dim)
+        query = self._embeddings[concept_id]
+
+        if _GEOOPT_AVAILABLE:
+            with torch.no_grad():
+                q = torch.tensor(query).unsqueeze(0)           # (1, dim) — converted once
+                cand = torch.tensor(candidates)                # (K, dim)
+                dists = self._ball.dist(q, cand).numpy()       # broadcast → (K,)
+        else:
+            dists = np.linalg.norm(candidates - query, axis=1)  # (K,)
+
+        results = sorted(zip(ids, (float(d) for d in dists)), key=lambda x: x[1])
         return results[:n]
