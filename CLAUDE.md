@@ -28,6 +28,17 @@ pytest tests/test_invariants.py::TestBettiNumbers::test_circle_has_one_loop -v
 
 Tests use `asyncio_mode="auto"` (configured in pyproject.toml) — no manual event loop setup needed.
 
+## Data Collection & Tooling (root-level scripts)
+
+These are standalone scripts at the repo root (not part of the `nhcs` package), used to produce experimental runs and review outputs:
+
+- **`collect_dataset.py`** — instruments the full pipeline and writes per-concept rows (Betti profile, complexity, AIAN novelty, physical params, NSM prime activations, biometrics, SDR) to `data/nhcs_run_*.csv` plus a `.db` ledger. Exposes module-level globals (`OUT_CSV`, `LEDGER_PATH`, `RNG_SEED`, `N_CONCEPTS`, `N_CRIM_STEPS`, `GRID_SIZE`) and an async `collect()`.
+- **`run005.py` / `script.py`** — thin run drivers: import `collect_dataset as cd`, override its globals, then `asyncio.run(cd.collect())`. Copy this pattern to launch a new numbered run rather than editing `collect_dataset.py` directly.
+- **`rate.py`** — local Flask app (`http://localhost:8765`) for human-in-the-loop phenomenological rating of renders; writes `data/prime_ratings.csv` (training data for the prime-mapping weights `W`). Reads renders from `renders/` and concept metadata from `data/nhcs_run_*.csv`.
+- **`build_gallery.py`** — regenerates `gallery.html` from PNGs in `renders/`.
+
+Scripts force UTF-8 on stdout for Windows (cp1252) compatibility — preserve that when adding new ones.
+
 ## Architecture
 
 Three decoupled layers communicate via an async message bus (`nhcs/bus.py`):

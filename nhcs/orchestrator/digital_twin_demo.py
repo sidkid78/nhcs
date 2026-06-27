@@ -23,6 +23,11 @@ import yaml
 from nhcs.bus import reset_bus
 from nhcs.orchestrator.runner import EndToEndRunner
 
+# Force UTF-8 on stdout so Unicode log chars (━, →) don't crash on Windows cp1252.
+# Must run before basicConfig, which captures sys.stdout as its stream.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
@@ -49,6 +54,7 @@ async def _run() -> None:
         rng_seed=cfg["run"]["seed"],
         grid_size=l2["twin"]["grid_size"],
         rse_n_seeds=l1["rse"]["n_seed_complexes"],
+        aian_config=l1.get("aian"),
     )
 
     logger.info("=" * 60)

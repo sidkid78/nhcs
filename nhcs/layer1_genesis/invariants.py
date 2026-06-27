@@ -4,7 +4,13 @@ Topological invariant computation using GUDHI persistent homology.
 Best practices (GUDHI 3.12):
 - Adaptive max_edge_length: set to a percentile of pairwise distances so the
   filtration captures meaningful local topology regardless of point cloud scale.
-- For N ≤ 80 points: plain RipsComplex is optimal.
+- For N ≤ 80 points: plain (dense) RipsComplex is optimal.
+- For very large clouds (N > _SPARSE_RIPS_THRESHOLD): switch to GUDHI's sparse
+  Rips approximation (`sparse=epsilon`), which builds a 1/(1-epsilon)-approx of
+  the filtration with far fewer simplices. This bounds memory in high-dimensional
+  filtrations where a dense Rips would exhaust RAM. AlphaComplex was considered
+  but is only efficient in low ambient dimension; MRO embeddings are
+  high-dimensional, so sparse Rips is the dimension-agnostic choice.
 - Pass points as list[list[float]] — GUDHI's C++ backend is faster.
 - complexity_score is normalised by mel to be scale-invariant. Without
   normalisation, MRO stretch accumulates exponentially over 500 iterations,
@@ -30,6 +36,16 @@ try:
 except ImportError:
     logger.warning("GUDHI not available — using stub invariant computation.")
     _GUDHI_AVAILABLE = False
+
+
+# Above this many points, auto-switch to GUDHI's sparse Rips approximation so a
+# dense filtration doesn't exhaust memory. Tunable; the demo/NHCS regime
+# (N ≤ 80) never trips it.
+_SPARSE_RIPS_THRESHOLD = 1000
+# Approximation ratio for sparse Rips: the complex is a 1/(1-epsilon)-approx of
+# the true Rips. Larger epsilon → sparser/faster/less accurate. 0.5 is GUDHI's
+# common default for large clouds.
+_SPARSE_RIPS_EPSILON = 0.5
 
 
 class PersistencePair(NamedTuple):
@@ -77,9 +93,19 @@ def compute_betti(
     points: np.ndarray,
     max_dimension: int = 2,
     max_edge_length: float | None = None,
+    sparse: float | None = None,
 ) -> InvariantProfile:
+    """
+    Compute topological invariants for a point cloud.
+
+    sparse : float, optional
+        Sparse Rips approximation ratio (epsilon). ``None`` (default) auto-selects:
+        dense Rips for N ≤ ``_SPARSE_RIPS_THRESHOLD``, else sparse with
+        ``_SPARSE_RIPS_EPSILON``. Pass an explicit float to force a ratio, or
+        ``0``/negative to force dense regardless of size.
+    """
     if _GUDHI_AVAILABLE:
-        return _compute_betti_gudhi(points, max_dimension, max_edge_length)
+        return _compute_betti_gudhi(points, max_dimension, max_edge_length, sparse)
     else:
         return _compute_betti_stub(points, max_dimension)
 
@@ -88,10 +114,18 @@ def _compute_betti_gudhi(
     points: np.ndarray,
     max_dimension: int,
     max_edge_length: float | None,
+    sparse: float | None = None,
 ) -> InvariantProfile:
     mel = max_edge_length if max_edge_length is not None else _adaptive_max_edge_length(points)
 
-    rips = gudhi.RipsComplex(points=points.tolist(), max_edge_length=mel)
+    # Auto-select sparse approximation for large clouds to bound memory; a
+    # non-positive epsilon forces dense. GUDHI treats sparse=None as dense.
+    if sparse is None and len(points) > _SPARSE_RIPS_THRESHOLD:
+        sparse = _SPARSE_RIPS_EPSILON
+    if sparse is not None and sparse <= 0:
+        sparse = None
+
+    rips = gudhi.RipsComplex(points=points.tolist(), max_edge_length=mel, sparse=sparse)
     simplex_tree = rips.create_simplex_tree(max_dimension=max_dimension + 1)
     simplex_tree.compute_persistence()
 
@@ -116,8 +150,9 @@ def _compute_betti_gudhi(
     score = topological_complexity_score(betti, pairs, mel=mel)
 
     logger.debug(
-        "GUDHI: N=%d d=%d mel=%.3e betti=%s score=%.3f",
-        len(points), points.shape[1] if points.ndim > 1 else 1, mel, betti, score,
+        "GUDHI: N=%d d=%d mel=%.3e sparse=%s betti=%s score=%.3f",
+        len(points), points.shape[1] if points.ndim > 1 else 1,
+        mel, sparse, betti, score,
     )
     return InvariantProfile(betti, euler, dimension, pairs, entropy, score)
 

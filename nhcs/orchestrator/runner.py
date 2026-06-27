@@ -51,6 +51,10 @@ class EndToEndRunner:
     ledger_path  : str
     grid_size    : int  (voxels per axis for TMFT field grid)
     rse_n_seeds  : int  (number of seed complexes per RSE run)
+    aian_config  : dict, optional
+        Keyword arguments for the AIAN discriminator (e.g. ``novelty_threshold``,
+        ``head_weights``, ``encoder_model``), typically the ``layer1.aian`` block
+        from the YAML config. Unknown keys are ignored. ``None`` → AIAN defaults.
     """
 
     def __init__(
@@ -61,13 +65,19 @@ class EndToEndRunner:
         rng_seed: int = 42,
         grid_size: int = 16,
         rse_n_seeds: int = 20,
+        aian_config: dict | None = None,
     ) -> None:
         # Layer 1
         self.rse = RecursiveSynthesisEngine(
             n_seed_complexes=rse_n_seeds,
             rng_seed=rng_seed,
         )
-        self.aian = AIAN()
+        # Keep only kwargs AIAN actually accepts, so extra config keys don't break it.
+        _aian_kwargs = {
+            k: v for k, v in (aian_config or {}).items()
+            if k in ("novelty_threshold", "encoder_model", "head_weights")
+        }
+        self.aian = AIAN(**_aian_kwargs)
         self.beam = DivergentBeamSearch(beam_width=3)
         self.merit = MeritEvaluator()
         self.validators = [ValidatorNode() for _ in range(n_validators)]

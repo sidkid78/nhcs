@@ -18,10 +18,27 @@ CV of pairwise distances measures actual geometric irregularity:
 from __future__ import annotations
 
 import logging
+from typing import Protocol, Sequence, runtime_checkable
 
 import numpy as np
+from scipy.spatial.distance import pdist
 
 logger = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class _Invariant(Protocol):
+    """Structural contract for the topological invariant a candidate carries."""
+    betti: list[int]
+    euler_characteristic: int
+    complexity_score: float
+
+
+@runtime_checkable
+class CandidateLike(Protocol):
+    """Structural contract for objects accepted by ``AIAN.filter``."""
+    invariant: _Invariant
+    point_cloud: np.ndarray
 
 try:
     from sentence_transformers import SentenceTransformer  # type: ignore
@@ -63,14 +80,33 @@ class AIAN:
         Minimum novelty score to pass (0–1). Below = rejected as too human-like.
     encoder_model : str
         SentenceTransformer model for the frozen reference encoder.
+    head_weights : Sequence[float], optional
+        Aggregation weights for the four heads
+        (semantic, heuristic, aesthetic, embedding). Defaults to
+        ``(0.15, 0.25, 0.20, 0.40)``. Need not be normalised — they are
+        rescaled to sum to 1.0 so w1..w4 can be tuned independently.
     """
+
+    DEFAULT_HEAD_WEIGHTS: tuple[float, float, float, float] = (0.15, 0.25, 0.20, 0.40)
 
     def __init__(
         self,
         novelty_threshold: float = 0.6,
         encoder_model: str = "all-MiniLM-L6-v2",
+        head_weights: Sequence[float] | None = None,
     ) -> None:
         self.novelty_threshold = novelty_threshold
+
+        w = np.asarray(head_weights if head_weights is not None
+                       else self.DEFAULT_HEAD_WEIGHTS, dtype=float)
+        if w.shape != (4,):
+            raise ValueError(f"head_weights must have 4 elements, got {w.shape}")
+        total = w.sum()
+        self.head_weights = w / total if total > 0 else w
+
+        # Cache embedding-head results keyed by (betti0, betti1, betti2, euler);
+        # the description string and similarity are fully determined by these.
+        self._embedding_cache: dict[tuple[int, int, int, int], float] = {}
         self._encoder: SentenceTransformer | None = None
 
         if _ST_AVAILABLE:
@@ -141,12 +177,10 @@ class AIAN:
         if n < 3:
             return 0.5
 
-        # Compute all pairwise distances (upper triangle only)
-        diffs = point_cloud[:, None] - point_cloud[None, :]   # (N,N,d)
-        dists = np.linalg.norm(diffs, axis=-1)                # (N,N)
-        upper = dists[np.triu_indices(n, k=1)]                # N*(N-1)/2 values
+        # Condensed pairwise distances: N*(N-1)/2 values, no (N,N,d) temporary.
+        upper = pdist(point_cloud)
 
-        if len(upper) == 0 or upper.mean() < 1e-12:
+        if upper.size == 0 or upper.mean() < 1e-12:
             return 0.5
 
         cv = upper.std() / upper.mean()
@@ -159,6 +193,11 @@ class AIAN:
             return 0.7
 
         b = (betti + [0, 0, 0])[:3]
+        key = (b[0], b[1], b[2], euler)
+        cached = self._embedding_cache.get(key)
+        if cached is not None:
+            return cached
+
         desc = (
             f"topology with {b[0]} components, "
             f"{b[1]} one-cycles, {b[2]} two-voids, "
@@ -167,7 +206,9 @@ class AIAN:
         emb = self._encoder.encode([desc], normalize_embeddings=True)[0]
         sims = self._human_embeddings @ emb
         max_sim = float(np.max(sims))
-        return float(np.clip(1.0 - max_sim, 0.0, 1.0))
+        novelty = float(np.clip(1.0 - max_sim, 0.0, 1.0))
+        self._embedding_cache[key] = novelty
+        return novelty
 
     # ── Public API ────────────────────────────────────────────────────
 
@@ -184,11 +225,10 @@ class AIAN:
         s3 = self._aesthetic_head(point_cloud)
         s4 = self._embedding_head(betti, euler)
 
-        weights = np.array([0.15, 0.25, 0.20, 0.40])
-        score = float(np.dot(weights, [s1, s2, s3, s4]))
+        score = float(np.dot(self.head_weights, [s1, s2, s3, s4]))
         return float(np.clip(score, 0.0, 1.0))
 
-    def filter(self, candidates: list) -> list:
+    def filter(self, candidates: list[CandidateLike]) -> list[CandidateLike]:
         """Filter CandidateConcepts to those passing novelty_threshold."""
         passed = []
         for c in candidates:

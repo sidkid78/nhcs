@@ -2018,7 +2018,7 @@ requires-dist = [
     { name = "jupyter", marker = "extra == 'dev'", specifier = ">=1.0" },
     { name = "matplotlib", marker = "extra == 'dev'", specifier = ">=3.9" },
     { name = "networkx", specifier = ">=3.3" },
-    { name = "numpy", specifier = ">=2.0.0" },
+    { name = "numpy", specifier = "<3.0.0" },
     { name = "open3d", specifier = ">=0.18" },
     { name = "persim", specifier = ">=0.3" },
     { name = "pydantic", specifier = ">=2.7" },

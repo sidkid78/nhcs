@@ -64,6 +64,13 @@ N_CRIM_STEPS = 20
 GRID_SIZE    = 8
 RSE_N_SEEDS  = 20
 RNG_SEED     = 42
+# AIAN discriminator hyperparameters — mirrors the `layer1.aian` block in
+# configs/default.yaml. Override per run from a driver, e.g.:
+#   cd.AIAN_CONFIG = {"novelty_threshold": 0.5, "head_weights": [0.4, 0.1, 0.1, 0.4]}
+AIAN_CONFIG  = {
+    "novelty_threshold": 0.6,
+    "head_weights": [0.15, 0.25, 0.20, 0.40],  # [semantic, heuristic, aesthetic, embedding]
+}
 OUT_DIR      = Path("data")
 OUT_CSV      = OUT_DIR / "nhcs_run_001.csv"
 LEDGER_PATH  = str(OUT_DIR / "nhcs_run_001.db")
@@ -92,7 +99,11 @@ async def collect():
 
     logger.info("Initialising pipeline components...")
     rse        = RecursiveSynthesisEngine(n_seed_complexes=RSE_N_SEEDS, rng_seed=RNG_SEED)
-    aian       = AIAN()
+    _aian_kwargs = {
+        k: v for k, v in (AIAN_CONFIG or {}).items()
+        if k in ("novelty_threshold", "encoder_model", "head_weights")
+    }
+    aian       = AIAN(**_aian_kwargs)
     beam       = DivergentBeamSearch(beam_width=3)
     merit      = MeritEvaluator()
     slash      = SlashingDetector()

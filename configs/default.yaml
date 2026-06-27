@@ -16,6 +16,11 @@ layer1:
   aian:
     novelty_threshold: 0.6   # below this → reject as too human-like
     encoder_model: "all-MiniLM-L6-v2"
+    # Aggregation weights for the four detection heads, in order:
+    # [semantic, heuristic, aesthetic, embedding]. Auto-normalised to sum 1.0,
+    # so w1 (anthropocentric bias) and w2 (linguistic mirroring) proxies can be
+    # tuned independently. See nhcs/layer1_genesis/aian.py.
+    head_weights: [0.15, 0.25, 0.20, 0.40]
   icvp:
     n_validators: 5
     supermajority: 0.667
