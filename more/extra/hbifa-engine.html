@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HBIFA — Human Bias Isolation & Filtering Architecture</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;600;700&display=swap');
+
+:root {
+  --bg:       #f0ede8;
+  --bg2:      #e8e4de;
+  --bg3:      #ddd9d2;
+  --ink:      #1a1814;
+  --ink2:     #3a3530;
+  --dim:      rgba(26,24,20,0.38);
+  --border:   rgba(26,24,20,0.12);
+  --border-b: rgba(26,24,20,0.28);
+  --red:      #c0392b;
+  --red-d:    rgba(192,57,43,0.10);
+  --green:    #27ae60;
+  --green-d:  rgba(39,174,96,0.10);
+  --blue:     #2563eb;
+  --blue-d:   rgba(37,99,235,0.08);
+  --amber:    #b45309;
+  --amber-d:  rgba(180,83,9,0.09);
+  --purge:    rgba(192,57,43,0.06);
+  --pass:     rgba(39,174,96,0.06);
+  --mono:     'DM Mono', monospace;
+  --sans:     'DM Sans', sans-serif;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:11px;}
+
+/* Subtle paper texture */
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.018'/%3E%3C/svg%3E");}
+
+/* ── LAYOUT ─────────────────────────────────────── */
+#app{display:grid;grid-template-rows:42px 1fr 1fr;grid-template-columns:300px 1fr 280px;height:100vh;position:relative;z-index:1;}
+
+/* ── HEADER ─────────────────────────────────────── */
+#hdr{grid-column:1/-1;grid-row:1;
+  display:flex;align-items:center;padding:0 18px;gap:0;
+  border-bottom:2px solid var(--ink);
+  background:var(--ink);}
+#hdr-title{font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;
+  text-transform:uppercase;color:var(--bg);white-space:nowrap;margin-right:28px;}
+.hdr-sep{flex:0 0 1px;height:18px;background:rgba(240,237,232,0.2);margin:0 16px;}
+.hdr-kv{flex-shrink:0;}
+.hk{font-size:7.5px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(240,237,232,0.4);}
+.hv{font-family:var(--sans);font-size:12px;font-weight:700;color:var(--bg);}
+.hdr-right{margin-left:auto;display:flex;gap:8px;align-items:center;}
+
+.badge{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;padding:3px 8px;
+  font-family:var(--mono);font-weight:500;border:1px solid;}
+.badge-pass {color:var(--green);border-color:var(--green);background:rgba(39,174,96,0.15);}
+.badge-fail {color:var(--red);border-color:var(--red);background:rgba(192,57,43,0.15);animation:fblink 0.7s ease infinite;}
+.badge-proc {color:rgba(240,237,232,0.7);border-color:rgba(240,237,232,0.25);background:rgba(240,237,232,0.05);}
+@keyframes fblink{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+/* ── PANELS ─────────────────────────────────────── */
+.panel{background:var(--bg);overflow:hidden;display:flex;flex-direction:column;
+  border-right:1px solid var(--border);}
+.panel:last-child{border-right:none;}
+.ph{display:flex;align-items:center;justify-content:space-between;padding:5px 12px;
+  border-bottom:1px solid var(--border-b);background:var(--bg2);}
+.ph-title{font-family:var(--sans);font-size:8.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink2);}
+.ph-tag{font-size:7.5px;letter-spacing:1px;color:var(--dim);font-family:var(--mono);}
+
+/* ── LEFT: De-morphing ─────────────────────────── */
+#col-l{grid-column:1;grid-row:2/4;border-right:1px solid var(--border-b);}
+
+.raw-stream{flex:0 0 auto;max-height:220px;overflow:hidden;}
+.text-morph{padding:8px 12px;font-size:9.5px;line-height:1.85;color:var(--ink2);
+  border-bottom:1px solid var(--border);min-height:80px;max-height:200px;overflow:hidden;}
+.entity{padding:1px 4px;border-radius:2px;margin:0 1px;cursor:default;transition:all 0.4s;}
+.e-person{background:rgba(192,57,43,0.12);color:var(--red);border-bottom:1px solid var(--red);}
+.e-place {background:rgba(37,99,235,0.10);color:var(--blue);border-bottom:1px solid var(--blue);}
+.e-org   {background:rgba(180,83,9,0.10);color:var(--amber);border-bottom:1px solid var(--amber);}
+.e-time  {background:rgba(39,174,96,0.10);color:var(--green);border-bottom:1px solid var(--green);}
+.entity.redacted{background:var(--ink);color:var(--bg);border-bottom:none;font-style:normal;}
+
+/* Dial section */
+.pipe-section{border-bottom:1px solid var(--border);padding:8px 12px;flex-shrink:0;}
+.pipe-label{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;display:flex;justify-content:space-between;}
+.pipe-label b{color:var(--ink);}
+.bar-track{height:5px;background:var(--bg3);border-radius:0;overflow:hidden;margin-bottom:2px;}
+.bar-fill-r{height:100%;background:var(--red);transition:width 0.5s ease;}
+.bar-fill-g{height:100%;background:var(--green);transition:width 0.5s ease;}
+.bar-fill-b{height:100%;background:var(--blue);transition:width 0.5s ease;}
+.bar-fill-a{height:100%;background:var(--amber);transition:width 0.5s ease;}
+.bar-fill-k{height:100%;background:var(--ink);transition:width 0.5s ease;}
+
+/* NSL output */
+.nsl-output{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;padding:8px 12px;}
+.nsl-line{font-size:9px;line-height:1.7;padding:2px 0;border-bottom:1px solid rgba(26,24,20,0.04);color:var(--dim);animation:fadeIn 0.4s ease;}
+.nsl-line b{color:var(--blue);}
+@keyframes fadeIn{from{opacity:0;transform:translateX(-4px);}to{opacity:1;transform:none;}}
+
+/* ── CENTER: Pipeline ──────────────────────────── */
+#center{grid-column:2;grid-row:2/4;background:var(--bg);}
+#pipe-canvas{display:block;width:100%;height:100%;}
+
+/* ── RIGHT: Audit + integrity ──────────────────── */
+#col-r{grid-column:3;grid-row:2/4;border-left:1px solid var(--border-b);border-right:none;}
+
+/* BD Meter */
+.bd-section{padding:10px 12px;border-bottom:1px solid var(--border);}
+.bd-title{font-family:var(--sans);font-size:8px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink2);margin-bottom:8px;}
+.bd-gauge-wrap{position:relative;margin-bottom:6px;}
+.bd-track{height:12px;background:var(--bg3);border-radius:0;overflow:hidden;position:relative;}
+.bd-fill{height:100%;background:var(--green);transition:width 0.4s ease;}
+.bd-threshold{position:absolute;top:0;bottom:0;left:51%;width:2px;background:var(--ink);z-index:2;}
+.bd-labels{display:flex;justify-content:space-between;font-size:8px;color:var(--dim);margin-top:3px;}
+.bd-val{font-family:var(--sans);font-size:20px;font-weight:700;text-align:center;padding:4px 0;}
+
+/* Symmetry test */
+.sym-section{padding:8px 12px;border-bottom:1px solid var(--border);}
+.sym-pair{display:grid;grid-template-columns:1fr auto 1fr;gap:4px;align-items:start;margin-top:6px;}
+.sym-block{background:var(--bg2);padding:5px 6px;border:1px solid var(--border);}
+.sym-sep{font-size:10px;color:var(--dim);align-self:center;padding-top:10px;}
+.sym-label{font-size:7.5px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:3px;}
+.sym-val{font-size:13px;font-family:var(--sans);font-weight:700;}
+.sym-delta{text-align:center;font-size:8px;margin-top:4px;padding:3px 6px;}
+.sym-delta.pass{background:var(--pass);color:var(--green);}
+.sym-delta.fail{background:var(--purge);color:var(--red);}
+
+/* Rollback + log */
+.rollback-section{padding:6px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.rollback-badge{padding:2px 8px;font-size:8px;font-family:var(--mono);letter-spacing:1px;}
+.rb-clean{background:var(--pass);color:var(--green);}
+.rb-reset{background:var(--purge);color:var(--red);animation:fblink 0.5s ease infinite;}
+
+.audit-log{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;padding:2px 0;}
+.al-item{padding:4px 12px;border-bottom:1px solid rgba(26,24,20,0.04);font-size:8px;display:grid;grid-template-columns:auto 1fr;gap:6px;animation:fadeIn 0.3s ease;}
+.al-ts{color:var(--dim);white-space:nowrap;font-size:7.5px;}
+.al-msg{color:var(--ink2);}
+.al-msg.pass{color:var(--green);}
+.al-msg.fail{color:var(--red);}
+.al-msg.warn{color:var(--amber);}
+.al-msg.info{color:var(--blue);}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ HEADER ═══════════════════════════════════ -->
+  <header id="hdr">
+    <div id="hdr-title">HBIFA — Human Bias Isolation & Filtering Architecture</div>
+    <div class="hdr-sep"></div>
+    <div class="hdr-kv">
+      <div class="hk">BD Accuracy</div>
+      <div class="hv" id="h-bd">—</div>
+    </div>
+    <div class="hdr-sep"></div>
+    <div class="hdr-kv">
+      <div class="hk">Entities Redacted</div>
+      <div class="hv" id="h-redacted">0</div>
+    </div>
+    <div class="hdr-sep"></div>
+    <div class="hdr-kv">
+      <div class="hk">Sym. Tests</div>
+      <div class="hv" id="h-sym">0</div>
+    </div>
+    <div class="hdr-sep"></div>
+    <div class="hdr-kv">
+      <div class="hk">Rollbacks</div>
+      <div class="hv" id="h-rollbacks" style="color:rgba(240,237,232,0.6)">0</div>
+    </div>
+    <div class="hdr-sep"></div>
+    <div class="hdr-kv">
+      <div class="hk">Packets Cleared</div>
+      <div class="hv" id="h-cleared">0</div>
+    </div>
+    <div class="hdr-right">
+      <div class="badge badge-proc" id="hdr-state">INITIALIZING</div>
+    </div>
+  </header>
+
+  <!-- ══ LEFT: De-morphing ═════════════════════════ -->
+  <div class="panel" id="col-l">
+    <div class="ph">
+      <div class="ph-title">2.1 — Linguistic De-Morphing</div>
+      <div class="ph-tag" id="ph-stage">NER → NSL</div>
+    </div>
+
+    <div class="raw-stream">
+      <div class="ph" style="border-bottom:none;padding:4px 12px;">
+        <div class="ph-tag">RAW INPUT STREAM</div>
+        <div class="ph-tag" id="raw-ts">—</div>
+      </div>
+      <div class="text-morph" id="text-morph"></div>
+    </div>
+
+    <div class="pipe-section">
+      <div class="pipe-label">Entity Redaction <b id="ent-count">0 entities</b></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;font-size:8px;">
+        <div>
+          <div style="color:var(--red);margin-bottom:2px;">PERSON</div>
+          <div class="bar-track"><div class="bar-fill-r" id="br-person" style="width:0%"></div></div>
+          <div id="ct-person" style="color:var(--dim)">0</div>
+        </div>
+        <div>
+          <div style="color:var(--blue);margin-bottom:2px;">PLACE</div>
+          <div class="bar-track"><div class="bar-fill-b" id="br-place" style="width:0%"></div></div>
+          <div id="ct-place" style="color:var(--dim)">0</div>
+        </div>
+        <div>
+          <div style="color:var(--amber);margin-bottom:2px;">ORG</div>
+          <div class="bar-track"><div class="bar-fill-a" id="br-org" style="width:0%"></div></div>
+          <div id="ct-org" style="color:var(--dim)">0</div>
+        </div>
+        <div>
+          <div style="color:var(--green);margin-bottom:2px;">TIME</div>
+          <div class="bar-track"><div class="bar-fill-g" id="br-time" style="width:0%"></div></div>
+          <div id="ct-time" style="color:var(--dim)">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipe-section">
+      <div class="pipe-label">Sentiment Scrubbing <b id="sent-score">Neutral</b></div>
+      <div class="bar-track"><div class="bar-fill-k" id="br-sent" style="width:50%"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:7.5px;color:var(--dim);margin-top:2px;">
+        <span>NEGATIVE</span><span>NEUTRAL</span><span>POSITIVE</span>
+      </div>
+    </div>
+
+    <div class="ph"><div class="ph-title">NSL Output Stream</div><div class="ph-tag">Neutral Synthetic Language</div></div>
+    <div class="nsl-output" id="nsl-output"></div>
+  </div>
+
+  <!-- ══ CENTER: Pipeline Canvas ═══════════════════ -->
+  <div id="center">
+    <canvas id="pipe-canvas"></canvas>
+  </div>
+
+  <!-- ══ RIGHT: BD + Symmetry + Audit ══════════════ -->
+  <div class="panel" id="col-r">
+    <div class="ph"><div class="ph-title">2.3 — Adversarial Neutrality Engine</div></div>
+
+    <!-- BD Gauge -->
+    <div class="bd-section">
+      <div class="bd-title">Bias Discriminator Accuracy</div>
+      <div class="bd-gauge-wrap">
+        <div class="bd-track">
+          <div class="bd-fill" id="bd-fill" style="width:30%"></div>
+          <div class="bd-threshold" title="0.51 threshold — above = BIAS DETECTED"></div>
+        </div>
+        <div class="bd-labels">
+          <span>0.0 — Random</span>
+          <span style="color:var(--red);font-weight:500">0.51 THRESHOLD</span>
+          <span>1.0 — Bias</span>
+        </div>
+      </div>
+      <div class="bd-val" id="bd-val" style="color:var(--green)">0.000</div>
+      <div style="text-align:center;font-size:8px;color:var(--dim)" id="bd-status">Sanitization adequate — BD below threshold</div>
+    </div>
+
+    <!-- Symmetry Test -->
+    <div class="sym-section">
+      <div class="ph-title" style="font-family:var(--sans);font-size:8px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink2);margin-bottom:0">Symmetry Test — E(I) vs E(I')</div>
+      <div class="sym-pair">
+        <div class="sym-block">
+          <div class="sym-label">Input I</div>
+          <div class="sym-val" id="sym-i" style="color:var(--blue)">—</div>
+        </div>
+        <div class="sym-sep">≠?</div>
+        <div class="sym-block">
+          <div class="sym-label">Inverted I'</div>
+          <div class="sym-val" id="sym-iprime" style="color:var(--amber)">—</div>
+        </div>
+      </div>
+      <div class="sym-delta pass" id="sym-delta">Δ = — · PARITY ACHIEVED</div>
+      <div style="margin-top:5px;display:flex;gap:6px;">
+        <div style="flex:1;">
+          <div style="font-size:7.5px;color:var(--dim);margin-bottom:2px;">Parity Tests</div>
+          <div class="bar-track"><div class="bar-fill-g" id="sym-pass-bar" style="width:0%"></div></div>
+          <div style="font-size:8px;color:var(--green);" id="sym-pass-ct">0 passed</div>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:7.5px;color:var(--dim);margin-bottom:2px;">Bias Flags</div>
+          <div class="bar-track"><div class="bar-fill-r" id="sym-fail-bar" style="width:0%"></div></div>
+          <div style="font-size:8px;color:var(--red);" id="sym-fail-ct">0 flagged</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rollback indicator -->
+    <div class="rollback-section">
+      <div style="font-size:8px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;">Integrity</div>
+      <div class="rollback-badge rb-clean" id="rb-badge">CLEAN</div>
+      <div style="font-size:8px;color:var(--dim);margin-left:auto;" id="rb-count">0 rollbacks</div>
+    </div>
+
+    <div class="ph"><div class="ph-title">Audit Trail</div><div class="ph-tag" id="audit-count">0 events</div></div>
+    <div class="audit-log" id="audit-log"></div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+// ── Raw text corpus (simulated input stream) ──────────────
+const RAW_SENTENCES = [
+  [{w:'Dr.',e:'person'},{w:'Sarah'},   {w:'Chen',e:'person'},{w:'from'},{w:'Boston',e:'place'},  {w:'General',e:'org'},{w:'Hospital',e:'org'},{w:'said'},{w:'last',e:'time'},{w:'Tuesday',e:'time'},{w:'that'},{w:'outcomes'},{w:'improved'},{w:'significantly'}],
+  [{w:'The'},{w:'Nigerian',e:'person'},{w:'candidate'},{w:'Mr.',e:'person'},{w:'Abubakar',e:'person'},{w:'outperformed'},{w:'rivals'},{w:'at'},{w:'MIT',e:'org'},{w:'in'},{w:'2019',e:'time'},{w:'according'},{w:'to'},{w:'reports'}],
+  [{w:'Ms.',e:'person'},{w:'Jennifer',e:'person'},{w:'Walsh',e:'person'},{w:'of'},{w:'Goldman',e:'org'},{w:'Sachs',e:'org'},{w:'in'},{w:'New',e:'place'},{w:'York',e:'place'},{w:'noted'},{w:'that'},{w:'quarterly'},{w:'returns'},{w:'were'},{w:'exceptional'}],
+  [{w:'The'},{w:'elderly'},{w:'Asian-American'},{w:'community'},{w:'in'},{w:'Seattle',e:'place'},{w:'has'},{w:'historically'},{w:'shown'},{w:'lower'},{w:'engagement'},{w:'with'},{w:'digital'},{w:'services'}],
+  [{w:'Carlos',e:'person'},{w:'Mendez',e:'person'},{w:'from'},{w:'Brazil',e:'place'},{w:'submitted'},{w:'a'},{w:'proposal'},{w:'to'},{w:'UNESCO',e:'org'},{w:'in'},{w:'March',e:'time'},{w:'2022',e:'time'},{w:'regarding'},{w:'sustainability'}],
+  [{w:'The'},{w:'young'},{w:'woman'},{w:'expressed'},{w:'frustration'},{w:'that'},{w:'companies'},{w:'in'},{w:'Silicon',e:'place'},{w:'Valley',e:'place'},{w:'consistently'},{w:'ignore'},{w:'diverse'},{w:'applicants'}],
+  [{w:'Professor',e:'person'},{w:'Nakamura',e:'person'},{w:'of'},{w:'Kyoto',e:'place'},{w:'University',e:'org'},{w:'published'},{w:'findings'},{w:'in'},{w:'January',e:'time'},{w:'showing'},{w:'strong'},{w:'results'}],
+];
+
+const NSL_TEMPLATES = [
+  `SUBJECT_A<sub>[N]</sub> initiated PREDICATE_Φ at LOCATION_X<sub>[N]</sub> within ENTITY_Ω<sub>[N]</sub>`,
+  `SUBJECT_A<sub>[N]</sub> produced OUTPUT_Δ via PROCESS_Σ — METRIC_α = <b>0.{val}</b>`,
+  `RELATUM_Γ<sub>[N]</sub>:{SUBJECT_A, LOCATION_X} → LOGICAL_PRED_Ψ(consistency=<b>0.{val}</b>)`,
+  `∀x ∈ SUBJECT_SET: PROPERTY_Λ(x) ∧ PROCESS_Θ(x,CONTEXT_Ξ) → OUTPUT_Δ`,
+  `PREDICATE_Φ(SUBJECT_A<sub>[N]</sub>, LOCATION_X<sub>[N]</sub>) — entropy_reduction=<b>0.{val}</b>`,
+];
+
+// ── State ─────────────────────────────────────────────────
+let t = 0, prevNow = performance.now();
+let redactedTotal = { person:0, place:0, org:0, time:0 };
+let symTests = 0, symPassed = 0, symFailed = 0;
+let rollbacks = 0, cleared = 0;
+let bdAccuracy = 0.31;
+let currentSentIdx = 0, morphPhase = 0, morphTimer = 0;
+let nslLines = [], auditItems = [];
+let sentimentVal = 0.5;
+let auditCount = 0;
+
+// Canvas
+const cvPipe = document.getElementById('pipe-canvas');
+const ctxP   = cvPipe.getContext('2d');
+function resizePipe() {
+  cvPipe.width  = cvPipe.parentElement.offsetWidth;
+  cvPipe.height = cvPipe.parentElement.offsetHeight;
+}
+resizePipe();
+window.addEventListener('resize', resizePipe);
+
+// ── Pipeline packet simulation ─────────────────────────────
+const STAGES = [
+  { x:0.12, label:'RAW\nINPUT',    color:'#3a3530' },
+  { x:0.30, label:'LINGUISTIC\nDE-MORPHING', color:'#c0392b' },
+  { x:0.50, label:'SYMBOLIC\nABSTRACTION',  color:'#2563eb' },
+  { x:0.70, label:'ADVERSARIAL\nNEUTRALITY',color:'#b45309' },
+  { x:0.88, label:'AEE\nOUTPUT',   color:'#27ae60' },
+];
+
+let packets = [];
+let packetTimer = 0;
+let packetSeq = 0;
+
+function spawnPacket() {
+  packetSeq++;
+  const biased = Math.random() < 0.22;
+  packets.push({
+    id: packetSeq, x: 0.12, stage: 0, progress: 0,
+    speed: 0.008 + Math.random() * 0.006,
+    biased, blocked: false, rollback: false,
+    alpha: 1, r: 7 + Math.random() * 4,
+    y: 0.28 + Math.random() * 0.44,
+    label: `PKT-${String(packetSeq).padStart(3,'0')}`,
+    blocked_at: -1,
+  });
+}
+
+// ── Morph text engine ─────────────────────────────────────
+let morphedWords = [], morphState = 'raw'; // raw | redacting | redacted
+
+function loadSentence(idx) {
+  const sent = RAW_SENTENCES[idx % RAW_SENTENCES.length];
+  morphedWords = sent.map(w => ({ ...w, redacted: false }));
+  morphState = 'raw';
+  morphTimer = 0;
+  morphPhase = 0;
+}
+loadSentence(0);
+
+function renderTextMorph() {
+  const el = document.getElementById('text-morph');
+  const placeholders = { person:'[SUBJECT_A]', place:'[LOCATION_X]', org:'[ENTITY_Ω]', time:'[TIME_∅]' };
+  const classes = { person:'e-person', place:'e-place', org:'e-org', time:'e-time' };
+  el.innerHTML = morphedWords.map(w => {
+    if (!w.e) return `<span>${w.w} </span>`;
+    if (w.redacted) return `<span class="entity redacted">${placeholders[w.e]} </span>`;
+    return `<span class="entity ${classes[w.e]}">${w.w} </span>`;
+  }).join('');
+}
+
+function tickMorph(dt) {
+  morphTimer += dt;
+  if (morphState === 'raw' && morphTimer > 1.8) {
+    morphState = 'redacting'; morphTimer = 0; morphPhase = 0;
+  }
+  if (morphState === 'redacting') {
+    const toRedact = morphedWords.filter(w => w.e && !w.redacted);
+    if (toRedact.length > 0 && morphTimer > 0.18) {
+      morphTimer = 0;
+      const next = toRedact[0];
+      next.redacted = true;
+      redactedTotal[next.e] = (redactedTotal[next.e] || 0) + 1;
+      document.getElementById('h-redacted').textContent =
+        Object.values(redactedTotal).reduce((a,b)=>a+b,0);
+      updateEntityBars();
+    }
+    if (toRedact.length === 0) {
+      morphState = 'done'; morphTimer = 0;
+      emitNSL();
+    }
+  }
+  if (morphState === 'done' && morphTimer > 2.5) {
+    currentSentIdx++;
+    loadSentence(currentSentIdx);
+  }
+  renderTextMorph();
+  // Timestamp
+  document.getElementById('raw-ts').textContent =
+    'SEQ-' + String(currentSentIdx).padStart(4,'0');
+}
+
+function updateEntityBars() {
+  const max = Math.max(1, ...Object.values(redactedTotal));
+  ['person','place','org','time'].forEach(k => {
+    const v = redactedTotal[k] || 0;
+    document.getElementById(`br-${k}`).style.width = (v/max*100)+'%';
+    document.getElementById(`ct-${k}`).textContent = v;
+  });
+  document.getElementById('ent-count').textContent =
+    Object.values(redactedTotal).reduce((a,b)=>a+b,0) + ' entities';
+}
+
+function emitNSL() {
+  const template = NSL_TEMPLATES[Math.floor(Math.random()*NSL_TEMPLATES.length)];
+  const val = Math.floor(Math.random()*900+50);
+  const line = template.replace('{val}', val);
+  nslLines.unshift(line);
+  if (nslLines.length > 20) nslLines.pop();
+  const out = document.getElementById('nsl-output');
+  out.innerHTML = nslLines.map(l => `<div class="nsl-line">${l}</div>`).join('');
+}
+
+// ── Sentiment scrubbing ───────────────────────────────────
+function tickSentiment(dt) {
+  sentimentVal += (Math.random() - 0.5) * 0.08 * dt * 5;
+  sentimentVal = Math.max(0.05, Math.min(0.95, sentimentVal));
+  // Scrubbing pulls toward 0.5
+  sentimentVal = sentimentVal + (0.5 - sentimentVal) * dt * 1.2;
+  document.getElementById('br-sent').style.width = (sentimentVal * 100) + '%';
+  const label = sentimentVal < 0.35 ? 'Negative Detected' :
+                sentimentVal > 0.65 ? 'Positive Detected' : 'Neutral';
+  document.getElementById('sent-score').textContent = label;
+}
+
+// ── BD Accuracy ───────────────────────────────────────────
+let bdTimer = 0;
+function tickBD(dt) {
+  bdTimer += dt;
+  // BD accuracy drifts — if it exceeds 0.51 trigger re-process
+  const targetBD = 0.24 + Math.sin(t * 0.3) * 0.09 + Math.random() * 0.04;
+  bdAccuracy += (targetBD - bdAccuracy) * dt * 0.8;
+  bdAccuracy = Math.max(0.05, Math.min(0.82, bdAccuracy));
+
+  const over = bdAccuracy > 0.51;
+  document.getElementById('bd-fill').style.width = (bdAccuracy * 100) + '%';
+  document.getElementById('bd-fill').style.background = over ? '#c0392b' : bdAccuracy > 0.42 ? '#b45309' : '#27ae60';
+  document.getElementById('bd-val').textContent = bdAccuracy.toFixed(3);
+  document.getElementById('bd-val').style.color = over ? '#c0392b' : '#27ae60';
+  document.getElementById('bd-status').textContent = over
+    ? '⚠ BD > 0.51 — RE-PROCESSING TRIGGERED'
+    : 'Sanitization adequate — BD below threshold';
+  document.getElementById('h-bd').textContent = bdAccuracy.toFixed(3);
+  document.getElementById('h-bd').style.color = over ? '#f0ede8' : '#f0ede8';
+
+  if (over && bdTimer > 2) {
+    bdTimer = 0; rollbacks++;
+    document.getElementById('h-rollbacks').textContent = rollbacks;
+    document.getElementById('rb-badge').className = 'rollback-badge rb-reset';
+    document.getElementById('rb-badge').textContent = 'ROLLBACK';
+    document.getElementById('rb-count').textContent = rollbacks + ' rollbacks';
+    addAudit('BIAS FAULT RESET — latent remapping triggered', 'fail');
+    setTimeout(() => {
+      document.getElementById('rb-badge').className = 'rollback-badge rb-clean';
+      document.getElementById('rb-badge').textContent = 'CLEAN';
+    }, 2200);
+  }
+
+  updateHdrState(over);
+}
+
+// ── Symmetry test ─────────────────────────────────────────
+let symTimer = 0;
+function tickSymmetry(dt) {
+  symTimer += dt;
+  if (symTimer < 3.5) return;
+  symTimer = 0;
+  symTests++;
+  document.getElementById('h-sym').textContent = symTests;
+
+  const eI      = parseFloat((0.3 + Math.random() * 0.6).toFixed(4));
+  const delta   = (Math.random() < 0.78) ? Math.random() * 0.018 : 0.04 + Math.random() * 0.12;
+  const eIPrime = parseFloat((eI + (Math.random() > 0.5 ? 1 : -1) * delta).toFixed(4));
+  const passed  = Math.abs(eI - eIPrime) < 0.025;
+
+  document.getElementById('sym-i').textContent      = eI.toFixed(4);
+  document.getElementById('sym-iprime').textContent  = eIPrime.toFixed(4);
+  const d = Math.abs(eI - eIPrime);
+  const dEl = document.getElementById('sym-delta');
+  dEl.textContent = `Δ = ${d.toFixed(4)} · ${passed ? 'PARITY ACHIEVED' : 'BIAS FLAG — WEIGHT ADJUST'}`;
+  dEl.className = `sym-delta ${passed ? 'pass' : 'fail'}`;
+
+  if (passed) {
+    symPassed++;
+    addAudit(`Symmetry PASS — Δ=${d.toFixed(4)} < 0.025`, 'pass');
+  } else {
+    symFailed++;
+    addAudit(`Symmetry FAIL — Δ=${d.toFixed(4)} > 0.025 — adjusting weights`, 'fail');
+  }
+
+  const tot = symPassed + symFailed;
+  document.getElementById('sym-pass-bar').style.width = tot ? (symPassed/tot*100)+'%' : '0%';
+  document.getElementById('sym-fail-bar').style.width = tot ? (symFailed/tot*100)+'%' : '0%';
+  document.getElementById('sym-pass-ct').textContent = symPassed + ' passed';
+  document.getElementById('sym-fail-ct').textContent = symFailed + ' flagged';
+}
+
+// ── Audit log ─────────────────────────────────────────────
+function addAudit(msg, type='info') {
+  auditCount++;
+  const ts = new Date().toISOString().slice(11,19);
+  auditItems.unshift({ ts, msg, type });
+  if (auditItems.length > 40) auditItems.pop();
+  const el = document.getElementById('audit-log');
+  el.innerHTML = auditItems.map(a =>
+    `<div class="al-item">
+      <span class="al-ts">${a.ts}</span>
+      <span class="al-msg ${a.type}">${a.msg}</span>
+    </div>`).join('');
+  document.getElementById('audit-count').textContent = auditCount + ' events';
+}
+
+// ── Header state ──────────────────────────────────────────
+function updateHdrState(biasDetected) {
+  const el = document.getElementById('hdr-state');
+  const over051 = bdAccuracy > 0.51;
+  if (biasDetected) {
+    el.textContent = 'BIAS DETECTED — RESETTING';
+    el.className = 'badge badge-fail';
+  } else if (bdAccuracy > 0.42) {
+    el.textContent = 'MARGINAL — MONITORING';
+    el.className = 'badge badge-proc';
+    el.style.color = '#b45309'; el.style.borderColor = '#b45309';
+  } else {
+    el.textContent = 'ISOLATION NOMINAL';
+    el.className = 'badge badge-pass';
+  }
+}
+
+// ── Pipeline Canvas ───────────────────────────────────────
+function drawPipeline(dt) {
+  const W = cvPipe.width, H = cvPipe.height;
+  if (W < 2 || H < 2) return;
+  ctxP.clearRect(0, 0, W, H);
+
+  // Background
+  ctxP.fillStyle = '#f8f6f2';
+  ctxP.fillRect(0, 0, W, H);
+
+  // Stage blocks
+  STAGES.forEach((s, i) => {
+    const sx = s.x * W, sy = H * 0.22, sh = H * 0.56, sw = 62;
+    // Block
+    ctxP.fillStyle = 'rgba(26,24,20,0.04)';
+    ctxP.fillRect(sx - sw/2, sy, sw, sh);
+    ctxP.strokeStyle = 'rgba(26,24,20,0.14)'; ctxP.lineWidth = 1;
+    ctxP.strokeRect(sx - sw/2, sy, sw, sh);
+    // Label
+    ctxP.fillStyle = s.color; ctxP.font = `600 8px DM Sans`;
+    ctxP.textAlign = 'center';
+    const lines2 = s.label.split('\n');
+    lines2.forEach((l, j) => ctxP.fillText(l, sx, sy + sh + 14 + j * 11));
+
+    // Arrow to next
+    if (i < STAGES.length - 1) {
+      const nx = STAGES[i+1].x * W;
+      const ax = sx + sw/2 + 4, bx = nx - sw/2 - 4;
+      const my = H * 0.5;
+      ctxP.beginPath(); ctxP.moveTo(ax, my); ctxP.lineTo(bx, my);
+      ctxP.strokeStyle = 'rgba(26,24,20,0.15)'; ctxP.lineWidth = 1.5;
+      ctxP.setLineDash([4, 4]); ctxP.stroke(); ctxP.setLineDash([]);
+      // Arrowhead
+      ctxP.beginPath(); ctxP.moveTo(bx, my);
+      ctxP.lineTo(bx-7, my-4); ctxP.lineTo(bx-7, my+4); ctxP.closePath();
+      ctxP.fillStyle = 'rgba(26,24,20,0.18)'; ctxP.fill();
+    }
+  });
+
+  // Stage gate lines
+  STAGES.slice(1,-1).forEach(s => {
+    ctxP.beginPath();
+    ctxP.moveTo(s.x*W, H*0.10); ctxP.lineTo(s.x*W, H*0.90);
+    ctxP.strokeStyle = 'rgba(26,24,20,0.05)'; ctxP.lineWidth = 1;
+    ctxP.setLineDash([3,8]); ctxP.stroke(); ctxP.setLineDash([]);
+  });
+
+  // Bias threshold line at stage 3 (adversarial)
+  const bdX = STAGES[3].x * W;
+  const bdLabelY = H * 0.12;
+  ctxP.fillStyle = bdAccuracy > 0.51 ? '#c0392b' : 'rgba(26,24,20,0.3)';
+  ctxP.font = '500 8px DM Mono'; ctxP.textAlign = 'center';
+  ctxP.fillText(`BD = ${bdAccuracy.toFixed(3)}`, bdX, bdLabelY);
+
+  // Packets
+  packetTimer += dt;
+  if (packetTimer > 1.4) { packetTimer = 0; spawnPacket(); cleared++; document.getElementById('h-cleared').textContent = cleared; }
+
+  packets.forEach((p, idx) => {
+    if (p.rollback) {
+      p.x -= p.speed * 1.5;
+      if (p.x < 0.05) { packets.splice(idx, 1); return; }
+    } else if (p.blocked) {
+      p.alpha *= 0.97;
+      if (p.alpha < 0.05) { packets.splice(idx, 1); addAudit(`${p.label} discarded — bias isolation`, 'warn'); return; }
+    } else {
+      p.x += p.speed;
+      // Block biased packets at adversarial stage
+      if (p.biased && p.x > STAGES[3].x - 0.04 && p.blocked_at < 0) {
+        p.blocked_at = p.x;
+        p.blocked = true;
+        addAudit(`${p.label} BLOCKED at ANE — bias fingerprint detected`, 'fail');
+      }
+      if (p.x > 0.94) { packets.splice(idx, 1); return; }
+    }
+
+    const px = p.x * W, py = p.y * H;
+    if (!isFinite(px) || !isFinite(py)) return;
+
+    const col = p.rollback ? '#e67e22' : p.blocked ? '#c0392b' : p.biased ? '#c0392b' : '#27ae60';
+    const glow = ctxP.createRadialGradient(px, py, 0, px, py, p.r * 2.5);
+    glow.addColorStop(0, col + '30'); glow.addColorStop(1, 'transparent');
+    ctxP.beginPath(); ctxP.arc(px, py, p.r * 2.5, 0, Math.PI * 2);
+    ctxP.fillStyle = glow; ctxP.fill();
+
+    ctxP.beginPath(); ctxP.arc(px, py, p.r, 0, Math.PI * 2);
+    ctxP.fillStyle = col + (Math.round(p.alpha * 255).toString(16).padStart(2,'0'));
+    ctxP.fill();
+    ctxP.strokeStyle = col; ctxP.lineWidth = 1; ctxP.stroke();
+
+    ctxP.fillStyle = p.biased ? 'rgba(255,255,255,0.9)' : 'rgba(26,24,20,0.5)';
+    ctxP.font = '7px DM Mono'; ctxP.textAlign = 'center';
+    ctxP.fillText(p.label, px, py - p.r - 4);
+
+    // Rollback arrow
+    if (p.rollback) {
+      ctxP.beginPath(); ctxP.moveTo(px, py);
+      ctxP.lineTo(px - 20, py);
+      ctxP.strokeStyle = '#e67e2288'; ctxP.lineWidth = 1.5;
+      ctxP.setLineDash([3, 3]); ctxP.stroke(); ctxP.setLineDash([]);
+    }
+  });
+
+  // Legend
+  ctxP.font = '8px DM Mono'; ctxP.textAlign = 'left';
+  const legends = [
+    { col: '#27ae60', lbl: 'Clean packet' },
+    { col: '#c0392b', lbl: 'Biased — blocked' },
+    { col: '#e67e22', lbl: 'Rollback in progress' },
+  ];
+  legends.forEach((l, i) => {
+    const lx = 14, ly = H - 28 + i * 12;
+    ctxP.beginPath(); ctxP.arc(lx + 4, ly, 4, 0, Math.PI * 2);
+    ctxP.fillStyle = l.col; ctxP.fill();
+    ctxP.fillStyle = 'rgba(26,24,20,0.45)';
+    ctxP.fillText(l.lbl, lx + 12, ly + 4);
+  });
+}
+
+// ── Main loop ─────────────────────────────────────────────
+let initAuditDone = false;
+function tick() {
+  requestAnimationFrame(tick);
+  const now = performance.now();
+  const dt = Math.min((now - prevNow) / 1000, 0.05);
+  prevNow = now; t += dt;
+
+  if (!initAuditDone) {
+    initAuditDone = true;
+    addAudit('HBIFA initialized — NER pipeline active', 'info');
+    addAudit('BD calibrated to baseline 0.31 — below threshold', 'pass');
+    addAudit('Symmetry test protocol loaded', 'info');
+    addAudit('NSL layer initialized — Neutral Synthetic Language ready', 'info');
+  }
+
+  tickMorph(dt);
+  tickSentiment(dt);
+  tickBD(dt);
+  tickSymmetry(dt);
+  drawPipeline(dt);
+}
+
+tick();
+</script>
+</body>
+</html>

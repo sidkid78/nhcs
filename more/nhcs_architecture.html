@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: transparent;
+      color: #1a1a2e;
+      padding: 16px;
+    }
+
+    h2.sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+    }
+
+    .title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #555;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .arch {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    /* Layers */
+    .layer {
+      border-radius: 12px;
+      padding: 14px 16px;
+      position: relative;
+      cursor: pointer;
+      transition: box-shadow 0.15s;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    .layer:hover {
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
+    }
+
+    .layer.active {
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .l1 {
+      background: #eef2ff;
+      border: 2px solid #6366f1;
+    }
+
+    .l2 {
+      background: #ecfdf5;
+      border: 2px solid #10b981;
+    }
+
+    .l3 {
+      background: #fff7ed;
+      border: 2px solid #f59e0b;
+    }
+
+    .lbus {
+      background: #f8fafc;
+      border: 2px dashed #94a3b8;
+    }
+
+    .layer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .layer-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      opacity: 0.6;
+    }
+
+    .layer-name {
+      font-size: 15px;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    .layer-sub {
+      font-size: 11px;
+      opacity: 0.65;
+      margin-top: 1px;
+    }
+
+    .chevron {
+      font-size: 12px;
+      opacity: 0.5;
+      transition: transform 0.2s;
+    }
+
+    .layer.active .chevron {
+      transform: rotate(180deg);
+    }
+
+    /* Modules grid */
+    .modules {
+      display: none;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(0, 0, 0, 0.07);
+    }
+
+    .layer.active .modules {
+      display: flex;
+    }
+
+    .mod {
+      background: rgba(255, 255, 255, 0.75);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 6px;
+      padding: 5px 9px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #333;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+
+    .mod:hover {
+      background: rgba(255, 255, 255, 1);
+    }
+
+    .mod-desc {
+      display: none;
+      font-size: 11px;
+      color: #555;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-top: 6px;
+      width: 100%;
+      line-height: 1.5;
+    }
+
+    .mod.open .mod-desc {
+      display: block;
+    }
+
+    .mod.open {
+      background: white;
+    }
+
+    /* Arrows between layers */
+    .arrow-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 4px 0;
+      position: relative;
+    }
+
+    .msg-pill {
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: 20px;
+      padding: 3px 10px;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    .msg-pill:hover {
+      transform: scale(1.05);
+    }
+
+    .msg-ct {
+      background: #6366f1;
+      color: white;
+    }
+
+    .msg-pr {
+      background: #10b981;
+      color: white;
+    }
+
+    .msg-if {
+      background: #f59e0b;
+      color: white;
+    }
+
+    .msg-rr {
+      background: #64748b;
+      color: white;
+    }
+
+    .arrow-svg {
+      width: 32px;
+      height: 20px;
+    }
+
+    /* Tooltip for message pills */
+    .pill-tooltip {
+      display: none;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 28px;
+      background: #1e293b;
+      color: white;
+      font-size: 11px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      width: 260px;
+      z-index: 10;
+      line-height: 1.5;
+      text-align: left;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    .pill-tooltip::before {
+      content: '';
+      position: absolute;
+      top: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 0 5px 5px 5px;
+      border-style: solid;
+      border-color: transparent transparent #1e293b transparent;
+    }
+
+    .arrow-row:hover .pill-tooltip {
+      display: block;
+    }
+
+    /* Bus detail */
+    .bus-topics {
+      display: none;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .lbus.active .bus-topics {
+      display: flex;
+    }
+
+    .topic-chip {
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: 4px;
+      padding: 3px 8px;
+      background: #e2e8f0;
+      color: #475569;
+    }
+  </style>
+</head>
+
+<body>
+  <h2 class="sr-only">NHCS Architecture: three-layer non-human conceptual synthesis system connected by an async message
+    bus</h2>
+
+  <div class="title">NHCS · Non-Human Conceptual Synthesis</div>
+
+  <div class="arch">
+
+    <!-- Layer 1 -->
+    <div class="layer l1" id="l1" onclick="toggleLayer('l1')">
+      <div class="layer-header">
+        <div>
+          <div class="layer-label">Layer 1</div>
+          <div class="layer-name">Genesis Core</div>
+          <div class="layer-sub">Algorithmic Concept Synthesis</div>
+        </div>
+        <div class="chevron">▼</div>
+      </div>
+      <div class="modules">
+        <div class="mod" onclick="toggleMod(event, this)">prt.py<div class="mod-desc">Pure Relational Topology — E-Nodes
+            &amp; Relational Distinctions as a weighted directed asymmetric hypergraph. Builds simplicial complexes from
+            abstract concepts.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">invariants.py<div class="mod-desc">Computes Betti numbers,
+            cohomology classes, and persistence entropy using GUDHI/Ripser. Concepts are treated as cohomology classes
+            in a multidimensional simplicial complex.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">rse.py<div class="mod-desc">Recursive Synthesis Engine —
+            Semantic Hypergraph + Dynamic Embedding Manifold. Proposes conceptual blends via categorical pushouts and
+            iterative synthesis.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">manifold.py<div class="mod-desc">Dynamic Embedding Manifold
+            using geoopt (Poincaré / product-of-spheres). Provides hyperbolic/Riemannian embeddings for hierarchical
+            conceptual structures.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">aian.py<div class="mod-desc">Anti-Imitation Adversarial
+            Network — novelty-penalizing GAN. Discriminator checks similarity against frozen human-corpus encoder
+            (sentence-transformers) to ensure non-human concept purity.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">search.py<div class="mod-desc">Divergent Beam Search —
+            standard beam search with a structural-distance penalty added to the score, driving exploration away from
+            known human concepts.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">merit.py<div class="mod-desc">Merit heuristics: MDL score,
+            topological consistency, Schmidhuber compression progress (Δcompression), fractal dimension, edge-of-chaos
+            ratio, and AIAN novelty score.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">icvp/<div class="mod-desc">Intersubjective Concept Valuation
+            Protocol — Tendermint-style BFT consensus requiring &gt;66% supermajority. Contains node.py (PoU sandbox),
+            consensus.py, ledger.py (append-only), slashing.py (human-taint detector).</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Arrow L1→L2 -->
+    <div class="arrow-row" style="margin: 2px 40px; position: relative;">
+      <span style="font-size:18px; color:#6366f1;">↓</span>
+      <div class="msg-pill msg-ct">ConceptTarget</div>
+      <span style="font-size:18px; color:#6366f1; opacity:0.3; margin-left:24px;">↑</span>
+      <div class="msg-pill msg-if" style="position:absolute; right: 0;">IntegrationFeedback</div>
+      <div class="pill-tooltip">
+        <b>ConceptTarget</b> (L1→L2): concept_id, TopologicalSignature (Betti, genus, crossing#), MeritScores,
+        arousal/valence scalars, Hopf map grid, coil power budget, viscosity bounds (80–150 mPa·s), reconfigure budget
+        (2s)<br><br>
+        <b>IntegrationFeedback</b> (L3→L1): CLI &amp; IIS time-series, BHI, SDR score — closes the outer loop, updates
+        merit priors
+      </div>
+    </div>
+
+    <!-- Layer 2 -->
+    <div class="layer l2" id="l2" onclick="toggleLayer('l2')">
+      <div class="layer-header">
+        <div>
+          <div class="layer-label">Layer 2</div>
+          <div class="layer-name">TMFT — Topological Magneto-Fluidic Translation</div>
+          <div class="layer-sub">Hopfion synthesis in chiral ferromagnetic nematic colloid</div>
+        </div>
+        <div class="chevron">▼</div>
+      </div>
+      <div class="modules">
+        <div class="mod" onclick="toggleMod(event, this)">topology_to_field.py<div class="mod-desc">Maps (crossing#,
+            bridge_index) → (p, q) torus-knot params → target Hopf map on S³→R³. The conceptual-to-physical translation
+            step.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">coil_field.py<div class="mod-desc">Biot–Savart + FEM solver
+            for the 12-channel dodecahedral coil array. Computes spatial B-field as a function of 12 channel currents
+            (nested tri-axial Helmholtz + Maxwell + RF micro-coils).</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">llg_solver.py<div class="mod-desc">Landau–Lifshitz–Gilbert
+            solver (MuMax3 wrapper) for magnetization dynamics in the Fe₃O₄ ferromagnetic nematic colloid.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">q_tensor.py<div class="mod-desc">Nematic Landau–de Gennes
+            Q-tensor PDE solver (FEniCSx). Handles liquid-crystal director field coupled with magnetization for stable
+            Hopfion formation.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">fluid.py<div class="mod-desc">Incompressible Navier–Stokes
+            with active stress from the director field. Verifies Hopf texture stability within viscosity window (80–150
+            mPa·s) without turbulence.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">photonics.py<div class="mod-desc">FDTD / transfer-matrix model
+            of the magneto-photonic lattice. Maps arousal/valence scalars to emission wavelength in 420–720 nm, 1–60 Hz
+            pulse.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">chamber.py<div class="mod-desc">50 mm sapphire chamber
+            boundary conditions. Enforces physical geometry constraints on all four solvers.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">controller.py<div class="mod-desc">Inverts target Hopfion →
+            optimal coil currents via adjoint methods or differentiable physics (JAX-MD / Warp). Receives
+            RetargetRequests from Layer 3 PID.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">twin.py<div class="mod-desc">Digital twin orchestrator —
+            couples and sequences the four solvers (LLG, Q-tensor, fluid, photonic) for a coherent multiphysics
+            simulation run.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Arrow L2→L3 -->
+    <div class="arrow-row" style="margin: 2px 40px; position: relative;">
+      <span style="font-size:18px; color:#10b981;">↓</span>
+      <div class="msg-pill msg-pr">PhysicalRealization</div>
+      <span style="font-size:18px; color:#64748b; opacity:0.5; margin-left:24px;">↑</span>
+      <div class="msg-pill msg-rr" style="position:absolute; right: 0;">RetargetRequest</div>
+      <div class="pill-tooltip">
+        <b>PhysicalRealization</b> (L2→L3): achieved &amp; target Hopf charge, charge error %, emission spectrum
+        trajectory (420–720nm @60Hz), renderable mesh + per-vertex field tensors, mean B-field (mT). <em>Physics
+          boundary — L3 cannot reach back into solvers.</em><br><br>
+        <b>RetargetRequest</b> (L3→L2, lateral): PID requests adjusted frequency if CLI overshoots. Clamped to 15–40 Hz
+        resonant stability regime.
+      </div>
+    </div>
+
+    <!-- Layer 3 -->
+    <div class="layer l3" id="l3" onclick="toggleLayer('l3')">
+      <div class="layer-header">
+        <div>
+          <div class="layer-label">Layer 3</div>
+          <div class="layer-name">CRIM — Cognitive Receptivity &amp; Integration Model</div>
+          <div class="layer-sub">VR + biometrics → closed-loop Flow State targeting</div>
+        </div>
+        <div class="chevron">▼</div>
+      </div>
+      <div class="modules">
+        <div class="mod" onclick="toggleMod(event, this)">render.py<div class="mod-desc">Hopf field → VR scene.
+            Unity/Unreal bridge or Open3D (headless). Renders mesh + per-vertex field tensors from PhysicalRealization
+            into an immersive visual experience.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">prime_map.py<div class="mod-desc">Maps Hopfion vectors onto 65
+            Universal Semantic Primes (Natural Semantic Metalanguage) plus embodied metaphor table. The semantic
+            grounding layer.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">phen_space.py<div class="mod-desc">Multi-Dimensional
+            Phenomenological Vector Space. Projects physical field data into a phenomenological representation space for
+            cognitive integration scoring.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">biometrics_lsl.py<div class="mod-desc">Lab Streaming Layer
+            ingest (real or simulated). Handles pupillometry, HRV, and GSR streams with sub-100ms sync across all
+            biometric channels.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">synthetic_subject.py<div class="mod-desc">Simulated human
+            subject: McSharry ECG model for HRV, Bach leaky-integrator GSR model, pupillary light-and-cognition model.
+            Enables headless closed-loop testing.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">cli.py<div class="mod-desc">Cognitive Load Index estimator.
+            Fuses biometric streams into a scalar CLI ∈ [0,1]. Target setpoint: 0.6 (Flow State).</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">pid.py<div class="mod-desc">PID controller: CLI error →
+            Immersion Intensity Score adjustment. May issue RetargetRequests to Layer 2 if frequency correction is
+            needed. Drives difficulty/vignetting/narrative abstraction.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">airlock.py<div class="mod-desc">Abstraction Calibration
+            Airlock. Gradual exposure gating — controls the rate at which novel non-human concepts are introduced to
+            prevent cognitive overload.</div>
+        </div>
+        <div class="mod" onclick="toggleMod(event, this)">metrics.py<div class="mod-desc">Computes BHI (Biometric
+            Homeostasis Index) and SDR (Semantic Distance Reduction) with confidence interval. These feed back to Layer
+            1 as Proof-of-Utility evidence.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bus -->
+    <div style="margin-top: 14px;">
+      <div class="layer lbus" id="lbus" onclick="toggleLayer('lbus')">
+        <div class="layer-header">
+          <div>
+            <div class="layer-label">Infrastructure</div>
+            <div class="layer-name">Message Bus</div>
+            <div class="layer-sub">Async pub/sub (in-process asyncio or ZeroMQ PUB/SUB)</div>
+          </div>
+          <div class="chevron">▼</div>
+        </div>
+        <div class="bus-topics">
+          <div class="topic-chip">concept_target → L2</div>
+          <div class="topic-chip">physical_realization → L3</div>
+          <div class="topic-chip">integration_feedback → L1</div>
+          <div class="topic-chip">retarget_request → L2</div>
+          <div class="topic-chip">icvp_vote ↔ L1</div>
+          <div style="font-size:11px; color:#64748b; width:100%; margin-top:4px;">Record/replay built-in via
+            <code>bus.record(topic, store)</code>. Swap ZeroMQ for multi-process mode — interface identical.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; font-size: 10px; color: #888;">
+    <span>Click any layer to expand modules</span>
+    <span>·</span>
+    <span>Click a module badge for details</span>
+    <span>·</span>
+    <span>Hover arrows for message schemas</span>
+  </div>
+
+  <script>
+    function toggleLayer(id) {
+      const el = document.getElementById(id);
+      el.classList.toggle('active');
+    }
+
+    function toggleMod(e, el) {
+      e.stopPropagation();
+      const wasOpen = el.classList.contains('open');
+      // Close siblings
+      el.parentNode.querySelectorAll('.mod.open').forEach(m => m.classList.remove('open'));
+      if (!wasOpen) el.classList.add('open');
+    }
+  </script>
+</body>
+
+</html>

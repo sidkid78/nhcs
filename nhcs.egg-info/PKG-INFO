@@ -1,0 +1,31 @@
+Metadata-Version: 2.4
+Name: nhcs
+Version: 0.1.0
+Summary: Non-Human Conceptual Synthesis — three-layer research prototype
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: gudhi>=3.9
+Requires-Dist: ripser>=0.6
+Requires-Dist: persim>=0.3
+Requires-Dist: hypernetx>=2.3
+Requires-Dist: networkx>=3.3
+Requires-Dist: torch>=2.3
+Requires-Dist: geoopt>=0.5
+Requires-Dist: sentence-transformers>=3.0
+Requires-Dist: pydantic>=2.7
+Requires-Dist: sqlitedict>=2.1
+Requires-Dist: jax>=0.4.28
+Requires-Dist: jaxlib>=0.4.28
+Requires-Dist: scipy>=1.13
+Requires-Dist: numpy>=2.0.0
+Requires-Dist: pylsl>=1.16
+Requires-Dist: simple-pid>=2.0
+Requires-Dist: open3d>=0.18
+Requires-Dist: pyzmq>=26.0
+Requires-Dist: pyyaml>=6.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.2; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23; extra == "dev"
+Requires-Dist: jupyter>=1.0; extra == "dev"
+Requires-Dist: matplotlib>=3.9; extra == "dev"
+Requires-Dist: ipywidgets>=8.1; extra == "dev"

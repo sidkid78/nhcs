@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RELP — Recursive Evaluation Loop Protocol</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&family=Barlow:wght@300;400;600;700;800&display=swap');
+
+:root {
+  --bg:      #090c12;
+  --bg2:     #0d1220;
+  --bg3:     #111828;
+  --teal:    #00c9a7;
+  --teal-d:  rgba(0,201,167,0.12);
+  --teal-dd: rgba(0,201,167,0.05);
+  --blue:    #3b82f6;
+  --blue-d:  rgba(59,130,246,0.12);
+  --yellow:  #f59e0b;
+  --yellow-d:rgba(245,158,11,0.12);
+  --red:     #ef4444;
+  --red-d:   rgba(239,68,68,0.12);
+  --purple:  #a855f7;
+  --purple-d:rgba(168,85,247,0.10);
+  --green:   #22c55e;
+  --text:    #cbd5e1;
+  --dim:     rgba(203,213,225,0.36);
+  --border:  rgba(203,213,225,0.08);
+  --border-b:rgba(203,213,225,0.18);
+  --mono:    'Fira Code', monospace;
+  --sans:    'Barlow', sans-serif;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--mono);font-size:11px;}
+
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse at 30% 20%,rgba(0,201,167,0.04) 0%,transparent 55%),
+             radial-gradient(ellipse at 70% 80%,rgba(59,130,246,0.04) 0%,transparent 55%);}
+body::after{content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.009) 2px,rgba(0,0,0,0.009) 4px);}
+
+/* ── LAYOUT ─────────────────────────────────────── */
+#app{display:grid;grid-template-rows:40px 1fr 1fr;grid-template-columns:290px 1fr 290px;height:100vh;position:relative;z-index:1;}
+
+/* ── HEADER ─────────────────────────────────────── */
+#hdr{grid-column:1/-1;grid-row:1;display:flex;align-items:center;padding:0 16px;gap:0;
+  border-bottom:1px solid var(--border-b);background:rgba(6,8,16,0.98);}
+#hdr h1{font-family:var(--sans);font-size:11px;font-weight:800;letter-spacing:2.5px;text-transform:uppercase;
+  color:var(--teal);text-shadow:0 0 18px rgba(0,201,167,0.4);margin-right:24px;white-space:nowrap;}
+.sep{flex:0 0 1px;height:18px;background:var(--border-b);margin:0 14px;}
+.hkv{flex-shrink:0;}
+.hk{font-size:7.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);}
+.hv{font-family:var(--sans);font-size:12px;font-weight:700;}
+.hdr-right{margin-left:auto;display:flex;gap:8px;align-items:center;}
+.phase-pill{font-size:8px;letter-spacing:1.5px;padding:3px 9px;border:1px solid;border-radius:2px;
+  text-transform:uppercase;font-family:var(--mono);transition:all 0.3s;}
+.pp-idle   {color:var(--dim);border-color:var(--border);}
+.pp-active {animation:pp-pulse 1.2s ease infinite;}
+.pp-p1{color:var(--teal);border-color:var(--teal);background:var(--teal-dd);}
+.pp-p2{color:var(--blue);border-color:var(--blue);background:var(--blue-d);}
+.pp-p3{color:var(--yellow);border-color:var(--yellow);background:var(--yellow-d);}
+.pp-p4{color:var(--green);border-color:var(--green);background:rgba(34,197,94,0.08);}
+.pp-p5{color:var(--purple);border-color:var(--purple);background:var(--purple-d);}
+.pp-rb{color:var(--red);border-color:var(--red);background:var(--red-d);animation:pp-pulse 0.6s ease infinite;}
+@keyframes pp-pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+/* ── PANELS ─────────────────────────────────────── */
+.col{overflow:hidden;display:flex;flex-direction:column;border-right:1px solid var(--border);}
+.col:last-child{border-right:none;border-left:1px solid var(--border);}
+.ph{display:flex;align-items:center;justify-content:space-between;padding:5px 11px;
+  border-bottom:1px solid var(--border);background:rgba(255,255,255,0.018);}
+.ph-t{font-family:var(--sans);font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;}
+.ph-s{font-size:7.5px;color:var(--dim);font-family:var(--mono);}
+.scroll{overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+
+/* ── PMA Metrics ─────────────────────────────────── */
+.pma-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;}
+.pma-cell{padding:8px 11px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);}
+.pma-cell:nth-child(2n){border-right:none;}
+.pma-key{font-size:7.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);margin-bottom:4px;}
+.pma-big{font-family:var(--sans);font-size:22px;font-weight:800;line-height:1;}
+.pma-bar{height:3px;background:rgba(255,255,255,0.06);border-radius:0;margin-top:5px;overflow:hidden;}
+.pma-fill{height:100%;border-radius:0;transition:width 0.6s ease;}
+.spark-wrap{height:28px;margin-top:4px;}
+.spark-cv{display:block;width:100%;height:100%;}
+
+/* ── Drift monitor ────────────────────────────────── */
+.drift-section{padding:8px 11px;border-bottom:1px solid var(--border);}
+.drift-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;}
+.drift-label{font-size:8px;color:var(--dim);letter-spacing:1px;width:90px;flex-shrink:0;}
+.drift-track{flex:1;height:5px;background:rgba(255,255,255,0.05);border-radius:0;overflow:hidden;position:relative;}
+.drift-fill{height:100%;transition:width 0.5s ease;}
+.drift-threshold{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.2);}
+.drift-val{font-size:9px;min-width:34px;text-align:right;}
+
+/* ── Outlier section ──────────────────────────────── */
+.outlier-list{padding:4px 0;}
+.outlier-item{padding:4px 11px;border-bottom:1px solid rgba(255,255,255,0.03);font-size:8.5px;
+  display:flex;gap:8px;align-items:baseline;animation:fIn 0.4s ease;}
+@keyframes fIn{from{opacity:0;transform:translateX(-5px);}to{opacity:1;transform:none;}}
+.oi-type{font-size:7px;padding:1px 5px;border-radius:1px;border:1px solid;flex-shrink:0;letter-spacing:1px;text-transform:uppercase;}
+.sf{color:var(--yellow);border-color:var(--yellow);background:var(--yellow-d);}
+.us{color:var(--purple);border-color:var(--purple);background:var(--purple-d);}
+.oi-body{color:var(--text);flex:1;}
+.oi-rca{font-size:7.5px;color:var(--dim);font-style:italic;}
+
+/* ── CENTER: Phase dial + utility graph ───────────── */
+#center{grid-column:2;grid-row:2/4;background:var(--bg);overflow:hidden;position:relative;}
+#center-canvas{display:block;width:100%;height:100%;}
+.center-hud{position:absolute;pointer-events:none;}
+#chu-tl{top:10px;left:12px;font-size:8px;color:var(--dim);}
+#chu-tr{top:10px;right:12px;text-align:right;font-size:8px;color:var(--dim);}
+#chu-bl{bottom:10px;left:12px;font-size:8px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;}
+#event-flash{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);
+  font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+  padding:5px 16px;border-radius:2px;border:1px solid;
+  opacity:0;pointer-events:none;transition:opacity 0.4s;white-space:nowrap;}
+#event-flash.show{opacity:1;}
+
+/* ── RIGHT: CVS + self-correction ────────────────── */
+.cvs-entry{padding:6px 11px;border-bottom:1px solid rgba(255,255,255,0.04);animation:fIn 0.4s ease;}
+.cvs-head{display:flex;align-items:baseline;gap:8px;margin-bottom:4px;}
+.cvs-ver{font-family:var(--sans);font-size:10px;font-weight:700;color:var(--teal);}
+.cvs-ver.active{color:var(--green);}
+.cvs-ver.rollback{color:var(--red);}
+.cvs-ver.shadow{color:var(--dim);}
+.cvs-ts{font-size:7.5px;color:var(--dim);}
+.cvs-status{font-size:7px;padding:1px 5px;border-radius:1px;border:1px solid;margin-left:auto;letter-spacing:1px;text-transform:uppercase;}
+.s-active{color:var(--green);border-color:var(--green);background:rgba(34,197,94,0.08);}
+.s-discarded{color:var(--dim);border-color:var(--border);text-decoration:line-through;}
+.s-rollback{color:var(--red);border-color:var(--red);background:var(--red-d);}
+.s-shadow{color:var(--yellow);border-color:var(--yellow);background:var(--yellow-d);}
+.cvs-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;font-size:8px;}
+.cvm{text-align:center;}
+.cvm-k{color:var(--dim);font-size:7px;text-transform:uppercase;letter-spacing:0.5px;}
+.cvm-v{font-family:var(--sans);font-weight:700;font-size:10px;}
+.cvs-summary{font-size:8px;color:var(--dim);margin-top:3px;font-style:italic;}
+
+/* Entropy cap */
+.entropy-section{padding:8px 11px;border-bottom:1px solid var(--border);}
+.ent-row{display:flex;align-items:center;gap:6px;margin-top:4px;}
+.ent-track{flex:1;height:7px;background:rgba(255,255,255,0.05);border-radius:0;overflow:hidden;position:relative;}
+.ent-fill{height:100%;transition:width 0.5s ease;background:linear-gradient(90deg,var(--teal),var(--yellow),var(--red));}
+.ent-cap{position:absolute;top:0;bottom:0;width:2px;background:rgba(255,255,255,0.3);}
+.ent-val{font-size:9px;min-width:30px;text-align:right;}
+
+/* Rule log */
+.rule-log{flex:0 0 100px;border-top:1px solid var(--border);display:flex;flex-direction:column;}
+.rl-stream{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;padding:2px 0;}
+.rl-item{padding:2px 11px;border-bottom:1px solid rgba(255,255,255,0.02);font-size:8px;
+  display:grid;grid-template-columns:auto 1fr;gap:6px;color:var(--dim);animation:fIn 0.3s ease;}
+.rl-phase{font-family:var(--sans);font-weight:700;font-size:8px;color:var(--teal);}
+.rl-promote{color:var(--green);}
+.rl-discard{color:var(--dim);text-decoration:line-through;}
+.rl-rollback{color:var(--red);}
+.rl-audit{color:var(--yellow);}
+.rl-meta{color:var(--purple);}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ HEADER ═══════════════════════════════════ -->
+  <header id="hdr">
+    <h1>RELP — Recursive Evaluation Loop Protocol</h1>
+    <div class="sep"></div>
+    <div class="hkv"><div class="hk">Active Version</div><div class="hv" id="h-ver" style="color:var(--green)">v1.0</div></div>
+    <div class="sep"></div>
+    <div class="hkv"><div class="hk">Cycle Count</div><div class="hv" id="h-cycles" style="color:var(--teal)">0</div></div>
+    <div class="sep"></div>
+    <div class="hkv"><div class="hk">Promotions</div><div class="hv" id="h-promos" style="color:var(--green)">0</div></div>
+    <div class="sep"></div>
+    <div class="hkv"><div class="hk">Discards</div><div class="hv" id="h-discards" style="color:var(--dim)">0</div></div>
+    <div class="sep"></div>
+    <div class="hkv"><div class="hk">Rollbacks</div><div class="hv" id="h-rbs" style="color:var(--red)">0</div></div>
+    <div class="sep"></div>
+    <div class="hkv"><div class="hk">Ops / Cycle</div><div class="hv" id="h-ops" style="color:var(--text)">1000</div></div>
+    <div class="hdr-right">
+      <div class="phase-pill pp-idle" id="pp-I">I AUDIT</div>
+      <div class="phase-pill pp-idle" id="pp-II">II SYNTH</div>
+      <div class="phase-pill pp-idle" id="pp-III">III MCG</div>
+      <div class="phase-pill pp-idle" id="pp-IV">IV PROMOTE</div>
+      <div class="phase-pill pp-idle" id="pp-V">V RECURSE</div>
+    </div>
+  </header>
+
+  <!-- ══ LEFT: PMA + Drift + Outliers ════════════════ -->
+  <div class="col">
+    <div class="ph"><div class="ph-t" style="color:var(--teal)">2.1 — Performance Metric Aggregator</div><div class="ph-s" id="pma-ops">0 ops</div></div>
+    <div class="pma-grid">
+      <div class="pma-cell">
+        <div class="pma-key">Logical Consistency</div>
+        <div class="pma-big" id="pm-lc" style="color:var(--teal)">—</div>
+        <div class="pma-bar"><div class="pma-fill" id="pb-lc" style="background:var(--teal);width:0%"></div></div>
+        <div class="spark-wrap"><canvas class="spark-cv" id="sp-lc"></canvas></div>
+      </div>
+      <div class="pma-cell">
+        <div class="pma-key">Exec. Efficiency</div>
+        <div class="pma-big" id="pm-ee" style="color:var(--blue)">—</div>
+        <div class="pma-bar"><div class="pma-fill" id="pb-ee" style="background:var(--blue);width:0%"></div></div>
+        <div class="spark-wrap"><canvas class="spark-cv" id="sp-ee"></canvas></div>
+      </div>
+      <div class="pma-cell">
+        <div class="pma-key">Predictive Accuracy</div>
+        <div class="pma-big" id="pm-pa" style="color:var(--yellow)">—</div>
+        <div class="pma-bar"><div class="pma-fill" id="pb-pa" style="background:var(--yellow);width:0%"></div></div>
+        <div class="spark-wrap"><canvas class="spark-cv" id="sp-pa"></canvas></div>
+      </div>
+      <div class="pma-cell">
+        <div class="pma-key">Structural Integrity</div>
+        <div class="pma-big" id="pm-si" style="color:var(--purple)">—</div>
+        <div class="pma-bar"><div class="pma-fill" id="pb-si" style="background:var(--purple);width:0%"></div></div>
+        <div class="spark-wrap"><canvas class="spark-cv" id="sp-si"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Drift / trigger monitoring -->
+    <div class="ph"><div class="ph-t" style="color:var(--yellow)">Phase I — Audit Triggers</div><div class="ph-s" id="drift-tag">monitoring</div></div>
+    <div class="drift-section">
+      <div class="drift-row">
+        <div class="drift-label">Temporal (ops)</div>
+        <div class="drift-track">
+          <div class="drift-fill" id="df-temporal" style="background:var(--teal);width:0%"></div>
+          <div class="drift-threshold" style="left:100%"></div>
+        </div>
+        <div class="drift-val" id="dv-temporal" style="color:var(--teal)">0</div>
+      </div>
+      <div class="drift-row">
+        <div class="drift-label">Quality σ</div>
+        <div class="drift-track">
+          <div class="drift-fill" id="df-sigma" style="background:var(--yellow);width:0%"></div>
+          <div class="drift-threshold" style="left:66.7%"></div>
+        </div>
+        <div class="drift-val" id="dv-sigma" style="color:var(--yellow)">0%</div>
+      </div>
+      <div class="drift-row">
+        <div class="drift-label">Trigger Source</div>
+        <div class="drift-track" style="background:transparent;">
+          <div style="font-size:8px;color:var(--dim);" id="trigger-src">NONE</div>
+        </div>
+        <div class="drift-val"></div>
+      </div>
+    </div>
+
+    <!-- Phase II outliers -->
+    <div class="ph"><div class="ph-t" style="color:var(--blue)">Phase II — Outlier Analysis</div><div class="ph-s" id="outlier-ct">0 outliers</div></div>
+    <div class="scroll" style="flex:1;">
+      <div id="outlier-list" class="outlier-list"></div>
+    </div>
+  </div>
+
+  <!-- ══ CENTER: Phase Dial + Utility Graph ════════════ -->
+  <div id="center">
+    <canvas id="center-canvas"></canvas>
+    <div class="center-hud" id="chu-tl">Recursive Evaluation Engine</div>
+    <div class="center-hud" id="chu-tr">
+      <div id="me-status" style="color:var(--purple)">META-EVALUATOR</div>
+      <div id="me-verdict" style="font-family:var(--sans);font-size:9px;color:var(--dim);margin-top:2px;"></div>
+    </div>
+    <div class="center-hud" id="chu-bl">Meta-Criterion Generation · Utility(v+1) vs Utility(v)</div>
+    <div id="event-flash"></div>
+  </div>
+
+  <!-- ══ RIGHT: CVS + Entropy + Log ════════════════════ -->
+  <div class="col">
+    <div class="ph"><div class="ph-t" style="color:var(--green)">2.3 — Criteria Versioning System</div><div class="ph-s" id="cvs-count">0 commits</div></div>
+    <div class="scroll" style="flex:1;max-height:50%;" id="cvs-list"></div>
+
+    <!-- Self-correction truth/merit weights -->
+    <div class="ph"><div class="ph-t" style="color:var(--purple)">4 — Self-Correction Weights</div></div>
+    <div style="padding:8px 11px;border-bottom:1px solid var(--border);">
+      <div class="drift-row">
+        <div class="drift-label" style="color:var(--teal)">Truth-by-Consistency</div>
+        <div class="drift-track"><div class="drift-fill" id="sc-truth" style="background:var(--teal);width:60%"></div></div>
+        <div class="drift-val" id="sv-truth" style="color:var(--teal)">0.60</div>
+      </div>
+      <div class="drift-row">
+        <div class="drift-label" style="color:var(--yellow)">Merit-by-Utility</div>
+        <div class="drift-track"><div class="drift-fill" id="sc-merit" style="background:var(--yellow);width:40%"></div></div>
+        <div class="drift-val" id="sv-merit" style="color:var(--yellow)">0.40</div>
+      </div>
+      <div style="font-size:8px;color:var(--dim);margin-top:4px;font-style:italic;" id="sc-note">Weights converging via multi-domain consistency…</div>
+    </div>
+
+    <!-- Entropy cap -->
+    <div class="ph"><div class="ph-t" style="color:var(--red)">5 — Entropy Cap (Rule Bloat)</div></div>
+    <div class="entropy-section">
+      <div class="drift-row">
+        <div class="drift-label">Complexity Index</div>
+        <div class="ent-track">
+          <div class="ent-fill" id="ent-fill" style="width:30%"></div>
+          <div class="ent-cap" style="left:72%"></div>
+        </div>
+        <div class="ent-val" id="ent-val" style="color:var(--teal)">0.30</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:7.5px;color:var(--dim);margin-top:2px;">
+        <span>Minimal</span><span style="color:rgba(255,255,255,0.3)">Cap 0.72</span><span>Bloat</span>
+      </div>
+      <div style="font-size:8px;margin-top:4px;" id="ent-status" style="color:var(--teal)">Rule set lean — MCG penalization inactive</div>
+    </div>
+
+    <div class="ph"><div class="ph-t" style="color:var(--teal)">Execution Log</div><div class="ph-s" id="log-ct">0 events</div></div>
+    <div class="rule-log">
+      <div class="rl-stream" id="rule-log"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+// ── Utils ─────────────────────────────────────────────────
+const clamp = (v,lo,hi) => Math.max(lo,Math.min(hi,v));
+const lerp  = (a,b,t2) => a+(b-a)*t2;
+const rnd   = (a,b) => a+Math.random()*(b-a);
+const isF   = v => isFinite(v)&&!isNaN(v);
+
+// ── Simulation state ──────────────────────────────────────
+let t=0, prevNow=performance.now();
+let opCount=0, cycleCount=0, promotions=0, discards=0, rollbacks=0;
+let logCount=0;
+
+// PMA metrics (0-1)
+let pma = { lc:0.72, ee:0.68, pa:0.64, si:0.79 };
+let pmaTarget = { lc:0.75, ee:0.70, pa:0.67, si:0.80 };
+const pmaHistory = { lc:[], ee:[], pa:[], si:[] };
+const PMA_HIST = 80;
+
+// Quality sigma (drift detection)
+let qualitySigma=0.08, sigmaTarget=0.08;
+
+// Versions
+let currentVersion = { major:1, minor:0, patch:0 };
+let cvsEntries = [];
+let activeVersionIdx = 0;
+let shadowVersion = null;
+
+// Phase state machine
+// phases: idle | audit | synth | mcg | promote | recurse | rollback
+let phase = 'idle', phaseTimer = 0, phaseDuration = 0;
+const PHASE_DUR = { idle:3.5, audit:2.0, synth:2.5, mcg:3.0, promote:1.8, recurse:2.5, rollback:2.0 };
+
+// Outliers
+let outliers = [], outlierCount=0;
+const OUTLIER_TYPES = ['SUCCESSFUL FAILURE','UNSUCCESSFUL SUCCESS'];
+const RCA_REASONS = [
+  'Criteria rigidity — edge-case not covered',
+  'Outdated weight distribution in heuristics',
+  'Context collapse — temporal window too narrow',
+  'Latent utility obscured by metric noise',
+  'Rule interaction produced false negative',
+  'Over-penalisation of structural variance',
+];
+
+// Self-correction weights
+let truthWeight=0.60, meritWeight=0.40;
+
+// Entropy / complexity
+let complexity=0.30, complexityTarget=0.30;
+
+// Utility history for graph
+const utilHistory = []; // {v, utilV, utilV1, promoted, tick}
+const MAX_UTIL_HIST = 40;
+
+// Canvas
+const cvC = document.getElementById('center-canvas');
+const ctxC = cvC.getContext('2d');
+function resize() {
+  cvC.width  = cvC.parentElement.offsetWidth;
+  cvC.height = cvC.parentElement.offsetHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ── CVS version string ─────────────────────────────────────
+function verStr(v) {
+  if (!v) return 'v?';
+  return `v${v.major}.${v.minor}.${v.patch}`;
+}
+function bumpVersion(v, type='minor') {
+  const nv = {...v};
+  if (type==='major') { nv.major++; nv.minor=0; nv.patch=0; }
+  else if (type==='minor') { nv.minor++; nv.patch=0; }
+  else { nv.patch++; }
+  return nv;
+}
+
+// ── Initial CVS seed ───────────────────────────────────────
+function seedCVS() {
+  cvsEntries.push({
+    version: {...currentVersion},
+    status: 'active',
+    utilityScore: 0.624,
+    truthW: 0.60, meritW: 0.40,
+    ruleCount: 8,
+    summary: 'Bootstrap — initial evaluation criteria',
+    ts: cycleCount,
+  });
+  renderCVS();
+}
+seedCVS();
+
+// ── Phase state machine ────────────────────────────────────
+function startPhase(ph) {
+  phase = ph;
+  phaseTimer = 0;
+  phaseDuration = PHASE_DUR[ph] || 2.0;
+  updatePhaseUI(ph);
+}
+
+function updatePhaseUI(ph) {
+  const map = { audit:'I', synth:'II', mcg:'III', promote:'IV', recurse:'V', rollback:'I' };
+  const cls = { audit:'pp-p1', synth:'pp-p2', mcg:'pp-p3', promote:'pp-p4', recurse:'pp-p5', rollback:'pp-rb' };
+  ['I','II','III','IV','V'].forEach(id => {
+    const el = document.getElementById('pp-'+id);
+    el.className = 'phase-pill pp-idle';
+  });
+  const activeId = map[ph];
+  if (activeId) {
+    const el = document.getElementById('pp-'+activeId);
+    if (el) el.className = `phase-pill pp-active ${cls[ph]||'pp-p1'}`;
+  }
+}
+
+// ── Outlier generation ────────────────────────────────────
+function emitOutlier() {
+  outlierCount++;
+  const type = Math.random() < 0.52 ? 'SF' : 'US';
+  const rca = RCA_REASONS[Math.floor(Math.random()*RCA_REASONS.length)];
+  const taskId = 'TASK-' + String(Math.floor(rnd(1000,9999))).slice(0,4);
+  outliers.unshift({ type, rca, taskId, id: outlierCount });
+  if (outliers.length > 12) outliers.pop();
+  renderOutliers();
+}
+
+function renderOutliers() {
+  const el = document.getElementById('outlier-list');
+  el.innerHTML = outliers.map(o => `
+    <div class="outlier-item">
+      <span class="oi-type ${o.type==='SF'?'sf':'us'}">${o.type==='SF'?'SUCC FAIL':'UNSUCC SUCC'}</span>
+      <div>
+        <div class="oi-body">${o.taskId}</div>
+        <div class="oi-rca">RCA: ${o.rca}</div>
+      </div>
+    </div>`).join('');
+  document.getElementById('outlier-ct').textContent = outlierCount + ' outliers';
+}
+
+// ── CVS render ─────────────────────────────────────────────
+function renderCVS() {
+  const el = document.getElementById('cvs-list');
+  el.innerHTML = [...cvsEntries].reverse().map((e,i) => {
+    const vc = e.status==='active'?'cvs-ver active':e.status==='rollback'?'cvs-ver rollback':e.status==='shadow'?'cvs-ver shadow':'cvs-ver';
+    const sc = e.status==='active'?'s-active':e.status==='discarded'?'s-discarded':e.status==='rollback'?'s-rollback':'s-shadow';
+    const sl = e.status==='active'?'ACTIVE':e.status==='discarded'?'DISCARDED':e.status==='rollback'?'ROLLBACK':'SHADOW';
+    return `<div class="cvs-entry">
+      <div class="cvs-head">
+        <div class="${vc}">${verStr(e.version)}</div>
+        <div class="cvs-ts">cycle ${e.ts}</div>
+        <div class="cvs-status ${sc}">${sl}</div>
+      </div>
+      <div class="cvs-metrics">
+        <div class="cvm"><div class="cvm-k">UTIL</div><div class="cvm-v" style="color:var(--teal)">${e.utilityScore.toFixed(3)}</div></div>
+        <div class="cvm"><div class="cvm-k">TRUTH</div><div class="cvm-v" style="color:var(--blue)">${e.truthW.toFixed(2)}</div></div>
+        <div class="cvm"><div class="cvm-k">MERIT</div><div class="cvm-v" style="color:var(--yellow)">${e.meritW.toFixed(2)}</div></div>
+        <div class="cvm"><div class="cvm-k">RULES</div><div class="cvm-v" style="color:var(--purple)">${e.ruleCount}</div></div>
+      </div>
+      <div class="cvs-summary">${e.summary}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('cvs-count').textContent = cvsEntries.length + ' commits';
+}
+
+// ── Phase execution logic ─────────────────────────────────
+let pendingV1 = null, pendingUtil = 0, activeUtil = 0;
+
+function executePhase() {
+  switch(phase) {
+
+    case 'audit':
+      cycleCount++;
+      opCount = 0;
+      document.getElementById('h-cycles').textContent = cycleCount;
+      // Snapshot PMA
+      const avgQuality = (pma.lc + pma.ee + pma.pa + pma.si) / 4;
+      activeUtil = clamp(avgQuality * 0.85 + truthWeight * 0.1 + meritWeight * 0.05, 0.1, 1.0);
+      emitOutlier();
+      if (Math.random() < 0.6) emitOutlier();
+      log('I', `Audit trigger — cycle ${cycleCount} snapshot captured`, 'audit');
+      log('I', `σ = ${qualitySigma.toFixed(3)} — ${qualitySigma>0.15?'DRIFT TRIGGER':'temporal trigger'}`, 'audit');
+      startPhase('synth');
+      break;
+
+    case 'synth':
+      log('II', `Outlier analysis — ${outliers.length} cases examined`, 'meta');
+      log('II', `Root cause: ${RCA_REASONS[Math.floor(Math.random()*RCA_REASONS.length)]}`, 'meta');
+      startPhase('mcg');
+      break;
+
+    case 'mcg':
+      // Generate shadow version
+      pendingV1 = bumpVersion(currentVersion, complexity > 0.65 ? 'patch' : Math.random()<0.3?'major':'minor');
+      const delta = rnd(-0.04, 0.12); // usually an improvement
+      pendingUtil = clamp(activeUtil + delta, 0.1, 1.0);
+      shadowVersion = {
+        version: pendingV1, status:'shadow',
+        utilityScore: pendingUtil,
+        truthW: clamp(truthWeight + rnd(-0.04,0.06), 0.2, 0.9),
+        meritW: clamp(meritWeight + rnd(-0.04,0.06), 0.2, 0.9),
+        ruleCount: Math.max(3, Math.round(8 + rnd(-2,4) - complexity*3)),
+        summary: `MCG: ${pendingUtil > activeUtil ? 'Positive' : 'Negative'} utility delta (${(pendingUtil-activeUtil>0?'+':'')}${(pendingUtil-activeUtil).toFixed(3)})`,
+        ts: cycleCount,
+      };
+      cvsEntries.push(shadowVersion);
+      renderCVS();
+      document.getElementById('me-verdict').textContent =
+        `v+1 utility = ${pendingUtil.toFixed(4)} vs v = ${activeUtil.toFixed(4)}`;
+
+      utilHistory.push({ utilV: activeUtil, utilV1: pendingUtil, promoted: pendingUtil > activeUtil, tick: t });
+      if (utilHistory.length > MAX_UTIL_HIST) utilHistory.shift();
+
+      log('III', `Shadow ${verStr(pendingV1)} — U(v+1)=${pendingUtil.toFixed(3)} vs U(v)=${activeUtil.toFixed(3)}`, 'meta');
+      if (pendingUtil > activeUtil) {
+        log('III', `U(v+1) > U(v) — proceed to promotion`, 'promote');
+        startPhase('promote');
+      } else {
+        discards++;
+        document.getElementById('h-discards').textContent = discards;
+        shadowVersion.status = 'discarded';
+        renderCVS();
+        log('III', `U(v+1) ≤ U(v) — ${verStr(pendingV1)} discarded`, 'discard');
+        flashEvent(`${verStr(pendingV1)} DISCARDED`, '#ef4444');
+        startPhase('recurse');
+      }
+      break;
+
+    case 'promote':
+      // Atomic swap
+      cvsEntries.forEach(e => { if (e.status==='active') e.status='historical'; });
+      shadowVersion.status = 'active';
+      currentVersion = {...pendingV1};
+      truthWeight = shadowVersion.truthW;
+      meritWeight = shadowVersion.meritW;
+      complexity  = clamp(complexity + rnd(-0.04, 0.08), 0.1, 0.95);
+      promotions++;
+      document.getElementById('h-promos').textContent = promotions;
+      document.getElementById('h-ver').textContent = verStr(currentVersion);
+      renderCVS();
+      log('IV', `ATOMIC SWAP → ${verStr(currentVersion)} is now active`, 'promote');
+      log('IV', `Context injection complete — decision modules updated`, 'promote');
+      flashEvent(`${verStr(currentVersion)} PROMOTED`, '#22c55e');
+      startPhase('recurse');
+      break;
+
+    case 'recurse':
+      // Brief re-operation under new criteria, then possible rollback check
+      const rollbackCheck = promotions > 0 && Math.random() < 0.08;
+      if (rollbackCheck) {
+        startPhase('rollback');
+      } else {
+        log('V', `Operating under ${verStr(currentVersion)} — PMA gathering data`, 'meta');
+        startPhase('idle');
+      }
+      break;
+
+    case 'rollback':
+      rollbacks++;
+      document.getElementById('h-rbs').textContent = rollbacks;
+      // Revert to previous stable
+      const stable = [...cvsEntries].reverse().find(e => e.status==='historical');
+      if (stable) {
+        cvsEntries.forEach(e => { if (e.status==='active') e.status='rollback'; });
+        stable.status = 'active';
+        stable.ts = cycleCount;
+        currentVersion = {...stable.version};
+        document.getElementById('h-ver').textContent = verStr(currentVersion);
+        renderCVS();
+        log('!', `ROLLBACK → reverted to ${verStr(currentVersion)}`, 'rollback');
+        flashEvent(`ROLLBACK → ${verStr(currentVersion)}`, '#ef4444');
+      }
+      startPhase('idle');
+      break;
+  }
+}
+
+// ── Sparkline helper ───────────────────────────────────────
+function drawSpark(id, hist, col) {
+  const cv = document.getElementById(id);
+  if (!cv) return;
+  const W = cv.offsetWidth, H = cv.offsetHeight;
+  if (cv.width!==W||cv.height!==H) { cv.width=W; cv.height=H; }
+  if (W<2||H<2) return;
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  if (hist.length<2) return;
+  const min=Math.min(...hist)-0.02, max=Math.max(...hist)+0.02;
+  const range=max-min||0.01;
+  ctx.beginPath(); ctx.strokeStyle=col; ctx.lineWidth=1.3;
+  hist.forEach((v,i)=>{
+    const x=i/(hist.length-1)*W, y=H-((v-min)/range*(H-2))-1;
+    if(!isF(x)||!isF(y)) return;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+}
+
+// ── Center canvas: Phase Dial + Utility Bar Chart ─────────
+function drawCenter(dt) {
+  const W=cvC.width, H=cvC.height;
+  if(W<2||H<2) return;
+  ctxC.clearRect(0,0,W,H);
+
+  const cx=W*0.38, cy=H*0.45, R=Math.min(W,H)*0.22;
+
+  // ── Phase Ring ────────────────────────────────────────
+  const phases = [
+    {label:'I\nAUDIT',    col:'#00c9a7', angle:-Math.PI*0.5},
+    {label:'II\nSYNTH',   col:'#3b82f6', angle:-Math.PI*0.5 + Math.PI*0.4},
+    {label:'III\nMCG',    col:'#f59e0b', angle:-Math.PI*0.5 + Math.PI*0.8},
+    {label:'IV\nPROMOTE', col:'#22c55e', angle:-Math.PI*0.5 + Math.PI*1.2},
+    {label:'V\nRECURSE',  col:'#a855f7', angle:-Math.PI*0.5 + Math.PI*1.6},
+  ];
+
+  const phaseMap = { audit:0, synth:1, mcg:2, promote:3, recurse:4, rollback:0 };
+  const activePhaseIdx = phaseMap[phase] ?? -1;
+  const progress = phaseDuration > 0 ? phaseTimer / phaseDuration : 0;
+
+  // Outer track
+  ctxC.beginPath(); ctxC.arc(cx,cy,R+14,0,Math.PI*2);
+  ctxC.strokeStyle='rgba(255,255,255,0.04)'; ctxC.lineWidth=22; ctxC.stroke();
+
+  // Phase arcs
+  phases.forEach((ph2,i)=>{
+    const start = -Math.PI*0.5 + i*(Math.PI*2/5);
+    const end   = start + Math.PI*2/5 - 0.08;
+    const isActive = i===activePhaseIdx;
+    ctxC.beginPath(); ctxC.arc(cx,cy,R+14,start,end);
+    ctxC.strokeStyle = isActive ? ph2.col : ph2.col+'30';
+    ctxC.lineWidth = isActive ? 22 : 18;
+    ctxC.stroke();
+    // Progress fill for active
+    if (isActive && progress > 0) {
+      ctxC.beginPath(); ctxC.arc(cx,cy,R+14,start,start+(end-start)*progress);
+      ctxC.strokeStyle = ph2.col + 'cc';
+      ctxC.lineWidth = 22; ctxC.stroke();
+    }
+    // Labels
+    const lAngle = (start+end)/2;
+    const lx = cx + (R+36)*Math.cos(lAngle);
+    const ly = cy + (R+36)*Math.sin(lAngle);
+    if(!isF(lx)||!isF(ly)) return;
+    ctxC.fillStyle = isActive ? ph2.col : ph2.col+'55';
+    ctxC.font = `${isActive?'600':'400'} 8px Barlow`;
+    ctxC.textAlign='center';
+    ph2.label.split('\n').forEach((ln,j)=>{
+      ctxC.fillText(ln, lx, ly + j*10 - 4);
+    });
+  });
+
+  // Inner circle
+  const innerGrd = ctxC.createRadialGradient(cx,cy,0,cx,cy,R);
+  innerGrd.addColorStop(0,'rgba(20,30,50,0.8)');
+  innerGrd.addColorStop(1,'rgba(10,15,30,0.6)');
+  ctxC.beginPath(); ctxC.arc(cx,cy,R,0,Math.PI*2);
+  ctxC.fillStyle=innerGrd; ctxC.fill();
+
+  // Center text
+  ctxC.fillStyle='rgba(203,213,225,0.7)';
+  ctxC.font='500 8px Fira Code'; ctxC.textAlign='center';
+  ctxC.fillText('PHASE', cx, cy-16);
+  ctxC.fillStyle = phases[activePhaseIdx>=0?activePhaseIdx:0].col;
+  ctxC.font='700 22px Barlow'; ctxC.textAlign='center';
+  ctxC.fillText(phase==='idle'?'IDLE':phase.toUpperCase(), cx, cy+8);
+  ctxC.fillStyle='rgba(203,213,225,0.4)';
+  ctxC.font='400 8px Fira Code'; ctxC.textAlign='center';
+  ctxC.fillText(verStr(currentVersion), cx, cy+22);
+
+  // Recursive feedback arrows
+  for (let i=0;i<5;i++) {
+    const ang = -Math.PI*0.5 + i*(Math.PI*2/5) + Math.PI/5;
+    const ax = cx + (R-22)*Math.cos(ang), ay = cy + (R-22)*Math.sin(ang);
+    const bax = cx + (R-10)*Math.cos(ang+0.18), bay = cy + (R-10)*Math.sin(ang+0.18);
+    if(!isF(ax)||!isF(ay)||!isF(bax)||!isF(bay)) continue;
+    ctxC.beginPath(); ctxC.moveTo(ax,ay); ctxC.lineTo(bax,bay);
+    ctxC.strokeStyle='rgba(203,213,225,0.08)'; ctxC.lineWidth=0.8; ctxC.stroke();
+  }
+
+  // ── Utility Bar Chart (right side) ────────────────────
+  const chartX = W*0.60, chartY = H*0.12, chartW = W*0.36, chartH = H*0.76;
+  if(!isF(chartX)||!isF(chartW)||chartW<2||chartH<2) return;
+
+  // Axes
+  ctxC.strokeStyle='rgba(255,255,255,0.08)'; ctxC.lineWidth=0.8;
+  ctxC.beginPath(); ctxC.moveTo(chartX,chartY); ctxC.lineTo(chartX,chartY+chartH); ctxC.stroke();
+  ctxC.beginPath(); ctxC.moveTo(chartX,chartY+chartH); ctxC.lineTo(chartX+chartW,chartY+chartH); ctxC.stroke();
+
+  // Reference line at active utility
+  if (utilHistory.length > 0) {
+    const refY = chartY + chartH*(1-activeUtil);
+    ctxC.beginPath(); ctxC.moveTo(chartX,refY); ctxC.lineTo(chartX+chartW,refY);
+    ctxC.strokeStyle='rgba(0,201,167,0.2)'; ctxC.lineWidth=0.7;
+    ctxC.setLineDash([4,6]); ctxC.stroke(); ctxC.setLineDash([]);
+    ctxC.fillStyle='rgba(0,201,167,0.4)'; ctxC.font='7px Fira Code'; ctxC.textAlign='right';
+    ctxC.fillText(`U(v)=${activeUtil.toFixed(3)}`, chartX-3, refY+3);
+  }
+
+  // Title
+  ctxC.fillStyle='rgba(203,213,225,0.35)'; ctxC.font='700 8px Barlow';
+  ctxC.textAlign='center'; ctxC.letterSpacing='1px';
+  ctxC.fillText('UTILITY COMPARISON HISTORY', chartX+chartW/2, chartY-6);
+
+  // Bars
+  const barW = Math.max(3, chartW/Math.max(utilHistory.length,1) - 1.5);
+  utilHistory.forEach((h,i)=>{
+    const bx = chartX + i*(chartW/Math.max(utilHistory.length,1));
+    // v bar
+    const vH = h.utilV*chartH;
+    ctxC.fillStyle='rgba(0,201,167,0.3)';
+    ctxC.fillRect(bx, chartY+chartH-vH, barW*0.45, vH);
+    // v+1 bar
+    const v1H = h.utilV1*chartH;
+    const v1Col = h.promoted ? 'rgba(34,197,94,0.7)' : 'rgba(239,68,68,0.5)';
+    ctxC.fillStyle=v1Col;
+    ctxC.fillRect(bx+barW*0.48, chartY+chartH-v1H, barW*0.45, v1H);
+    // Promoted marker
+    if (h.promoted) {
+      ctxC.fillStyle='rgba(34,197,94,0.9)';
+      ctxC.font='7px Barlow'; ctxC.textAlign='center';
+      ctxC.fillText('↑', bx+barW*0.5, chartY+chartH-v1H-4);
+    }
+  });
+
+  // Legend
+  const lx2=chartX+4, ly2=chartY+chartH-18;
+  ctxC.fillStyle='rgba(0,201,167,0.6)'; ctxC.fillRect(lx2,ly2,8,5);
+  ctxC.fillStyle='rgba(34,197,94,0.8)'; ctxC.fillRect(lx2+40,ly2,8,5);
+  ctxC.fillStyle='rgba(239,68,68,0.7)'; ctxC.fillRect(lx2+90,ly2,8,5);
+  ctxC.fillStyle='rgba(203,213,225,0.4)'; ctxC.font='7px Fira Code'; ctxC.textAlign='left';
+  ctxC.fillText('U(v)', lx2+11, ly2+5);
+  ctxC.fillText('promoted', lx2+51, ly2+5);
+  ctxC.fillText('discarded', lx2+101, ly2+5);
+}
+
+// ── Event flash ───────────────────────────────────────────
+function flashEvent(text, col) {
+  const el = document.getElementById('event-flash');
+  el.textContent = text;
+  el.style.color = col; el.style.borderColor = col;
+  el.style.background = col + '18';
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 2200);
+}
+
+// ── Log helper ────────────────────────────────────────────
+let logItems=[];
+function log(phase2, msg, type='info') {
+  logCount++;
+  logItems.unshift({phase:phase2, msg, type});
+  if(logItems.length>40) logItems.pop();
+  const el=document.getElementById('rule-log');
+  const typeClass = {promote:'rl-promote',discard:'rl-discard',rollback:'rl-rollback',audit:'rl-audit',meta:'rl-meta'}[type]||'';
+  el.innerHTML=logItems.map(l=>`
+    <div class="rl-item">
+      <span class="rl-phase">[${l.phase}]</span>
+      <span class="${typeClass}">${l.msg}</span>
+    </div>`).join('');
+  document.getElementById('log-ct').textContent=logCount+' events';
+}
+
+// ── Main tick ─────────────────────────────────────────────
+let opAccum=0, pmaUpdateTimer=0;
+startPhase('idle');
+log('SYS','RELP initialized — v1.0 active in Epistemic Core','meta');
+log('SYS','PMA monitoring — temporal trigger at 1000 ops','audit');
+
+function tick() {
+  requestAnimationFrame(tick);
+  const now=performance.now();
+  const dt=Math.min((now-prevNow)/1000, 0.05);
+  prevNow=now; t+=dt;
+
+  // Op counter (simulated)
+  opAccum+=dt*120; // ~120 ops/sec
+  while(opAccum>=1) { opCount++; opAccum--; }
+  document.getElementById('pma-ops').textContent = opCount.toLocaleString()+' ops';
+
+  // PMA drift
+  pmaUpdateTimer+=dt;
+  if(pmaUpdateTimer>0.5) {
+    pmaUpdateTimer=0;
+    ['lc','ee','pa','si'].forEach(k=>{
+      pmaTarget[k] = clamp(pmaTarget[k]+rnd(-0.03,0.03), 0.25, 0.97);
+      pma[k] = lerp(pma[k], pmaTarget[k], 0.35);
+    });
+    const avgQ=(pma.lc+pma.ee+pma.pa+pma.si)/4;
+    sigmaTarget = Math.abs(Math.sin(t*0.2)*0.15+rnd(0.03,0.06));
+    qualitySigma = lerp(qualitySigma, sigmaTarget, 0.3);
+    // Push to history
+    ['lc','ee','pa','si'].forEach(k=>{
+      if(!pmaHistory[k]) pmaHistory[k]=[];
+      pmaHistory[k].push(pma[k]);
+      if(pmaHistory[k].length>PMA_HIST) pmaHistory[k].shift();
+    });
+  }
+
+  // Update PMA display
+  const pmaKeys = [{k:'lc',id:'pm-lc',bid:'pb-lc',sid:'sp-lc',col:'#00c9a7'},
+                   {k:'ee',id:'pm-ee',bid:'pb-ee',sid:'sp-ee',col:'#3b82f6'},
+                   {k:'pa',id:'pm-pa',bid:'pb-pa',sid:'sp-pa',col:'#f59e0b'},
+                   {k:'si',id:'pm-si',bid:'pb-si',sid:'sp-si',col:'#a855f7'}];
+  pmaKeys.forEach(pk=>{
+    const v=pma[pk.k];
+    document.getElementById(pk.id).textContent = (v*100).toFixed(1)+'%';
+    document.getElementById(pk.bid).style.width=(v*100)+'%';
+    drawSpark(pk.sid, pmaHistory[pk.k]||[], pk.col);
+  });
+
+  // Drift display
+  const opPct = Math.min(opCount/1000*100, 100);
+  document.getElementById('df-temporal').style.width=opPct+'%';
+  document.getElementById('dv-temporal').textContent=opCount;
+  const sigmaPct=Math.min(qualitySigma/0.22*100,100);
+  document.getElementById('df-sigma').style.width=sigmaPct+'%';
+  document.getElementById('dv-sigma').textContent=(qualitySigma*100).toFixed(1)+'%';
+  document.getElementById('df-sigma').style.background=qualitySigma>0.15?'#ef4444':'#f59e0b';
+
+  const trigSrc = opCount>=1000?'TEMPORAL':qualitySigma>0.15?'DRIFT SIGMA':'NONE';
+  document.getElementById('trigger-src').textContent=trigSrc;
+  document.getElementById('trigger-src').style.color=trigSrc!=='NONE'?'#f59e0b':'rgba(203,213,225,0.36)';
+  document.getElementById('drift-tag').textContent=trigSrc!=='NONE'?'⚡ TRIGGER':'monitoring';
+
+  // Phase timer
+  phaseTimer+=dt;
+  const shouldTrigger = opCount>=1000 || qualitySigma>0.15;
+  if(phase==='idle' && phaseTimer>phaseDuration && shouldTrigger) startPhase('audit');
+  if(phase!=='idle' && phaseTimer>=phaseDuration) executePhase();
+
+  // Self-correction weights display
+  document.getElementById('sc-truth').style.width=(truthWeight*100)+'%';
+  document.getElementById('sv-truth').textContent=truthWeight.toFixed(3);
+  document.getElementById('sc-merit').style.width=(meritWeight*100)+'%';
+  document.getElementById('sv-merit').textContent=meritWeight.toFixed(3);
+  const avgQ2=(pma.lc+pma.ee+pma.pa+pma.si)/4;
+  document.getElementById('sc-note').textContent=
+    avgQ2>0.75?'High consistency — truth weight increasing':'Low merit efficiency — rebalancing…';
+
+  // Entropy cap
+  complexityTarget=clamp(complexityTarget+rnd(-0.01,0.015)*dt*3,0.1,0.95);
+  complexity=lerp(complexity,complexityTarget,dt*0.5);
+  document.getElementById('ent-fill').style.width=(complexity*100)+'%';
+  document.getElementById('ent-val').textContent=complexity.toFixed(3);
+  document.getElementById('ent-val').style.color=complexity>0.72?'#ef4444':complexity>0.55?'#f59e0b':'#00c9a7';
+  document.getElementById('ent-status').textContent=
+    complexity>0.72?'⚠ RULE BLOAT — MCG penalization active':
+    complexity>0.55?'Moderate complexity — monitoring':
+    'Rule set lean — MCG penalization inactive';
+  document.getElementById('ent-status').style.color=complexity>0.72?'#ef4444':complexity>0.55?'#f59e0b':'rgba(203,213,225,0.5)';
+
+  // Header
+  document.getElementById('h-cycles').textContent=cycleCount;
+
+  drawCenter(dt);
+}
+
+tick();
+</script>
+</body>
+</html>

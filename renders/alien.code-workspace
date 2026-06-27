@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"name": "alien",
+			"path": ".."
+		},
+		{
+			"name": "20260314_151749_goal_develop_the_core_computational_th",
+			"path": "../../gemini_agent/runs/20260314_151749_goal_develop_the_core_computational_th"
+		},
+		{
+			"name": "20260314_192449_strategic_executive_brief_to_ch",
+			"path": "../../gemini_agent/runs/20260314_192449_strategic_executive_brief_to_ch"
+		}
+	],
+	"settings": {}
+}

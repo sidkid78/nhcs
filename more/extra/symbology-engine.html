@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phenomenological Symbology Engine</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+:root {
+  --bg:       #020408;
+  --bg2:      #04080f;
+  --panel:    rgba(4,10,18,0.92);
+  --border:   rgba(0,220,255,0.14);
+  --border-b: rgba(0,220,255,0.45);
+  --cyan:     #00dcff;
+  --violet:   #b06aff;
+  --green:    #00ffb0;
+  --amber:    #ffb030;
+  --red:      #ff4466;
+  --text:     #c4dde8;
+  --dim:      rgba(196,221,232,0.4);
+  --mono:     'Share Tech Mono', monospace;
+  --head:     'Orbitron', monospace;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { width:100vw; height:100vh; overflow:hidden; background:var(--bg); color:var(--text); font-family:var(--mono); font-size:11px; }
+
+/* noise */
+body::before {
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+}
+/* scanlines */
+body::after {
+  content:''; position:fixed; inset:0; z-index:9999; pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.012) 2px,rgba(0,0,0,0.012) 4px);
+}
+
+#app {
+  display:grid;
+  grid-template-rows: 40px 1fr;
+  grid-template-columns: 1fr;
+  height:100vh;
+  position:relative; z-index:1;
+}
+
+/* ── Header ── */
+#hdr {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 16px;
+  border-bottom:1px solid var(--border);
+  background:rgba(0,3,8,0.95);
+  grid-column:1/-1;
+}
+#hdr h1 { font-family:var(--head); font-size:10px; font-weight:700; letter-spacing:3px; color:var(--violet); text-shadow:0 0 20px rgba(176,106,255,0.5); }
+.hdr-right { display:flex; gap:20px; align-items:center; }
+.hdr-tag { font-size:9px; letter-spacing:1.5px; color:var(--dim); text-transform:uppercase; }
+.hdr-tag b { color:var(--cyan); }
+
+/* ── Body grid ── */
+#body {
+  display:grid;
+  grid-template-columns: 272px 1fr 288px;
+  overflow:hidden;
+}
+
+/* ── Panels ── */
+.col {
+  display:flex; flex-direction:column;
+  border-right:1px solid var(--border);
+  overflow:hidden;
+}
+.col:last-child { border-right:none; border-left:1px solid var(--border); }
+
+.section {
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.sec-head {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:6px 12px;
+  background:rgba(0,220,255,0.03);
+  border-bottom:1px solid var(--border);
+  font-family:var(--head); font-size:8px; letter-spacing:2px; font-weight:700;
+  text-transform:uppercase; color:var(--cyan);
+}
+.sec-head span { font-family:var(--mono); font-size:9px; color:var(--dim); letter-spacing:0; font-weight:400; font-family:var(--mono); }
+
+/* ── Sliders ── */
+.prim-row {
+  padding:7px 12px;
+  border-bottom:1px solid rgba(0,220,255,0.04);
+}
+.prim-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; }
+.prim-label { font-size:9px; letter-spacing:1px; text-transform:uppercase; color:var(--dim); }
+.prim-val { font-size:11px; color:var(--cyan); min-width:36px; text-align:right; }
+.prim-slider-wrap { position:relative; height:20px; display:flex; align-items:center; }
+input[type=range] {
+  -webkit-appearance:none; width:100%; height:3px;
+  background:rgba(0,220,255,0.12); border-radius:2px; outline:none; cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance:none; width:11px; height:11px; border-radius:50%;
+  background:var(--violet); box-shadow:0 0 8px rgba(176,106,255,0.6);
+  cursor:pointer; transition:transform 0.1s;
+}
+input[type=range]::-webkit-slider-thumb:hover { transform:scale(1.3); }
+input[type=range].green::-webkit-slider-thumb { background:var(--green); box-shadow:0 0 8px rgba(0,255,176,0.6); }
+input[type=range].amber::-webkit-slider-thumb { background:var(--amber); box-shadow:0 0 8px rgba(255,176,48,0.6); }
+.zero-line { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:1px; height:10px; background:rgba(255,255,255,0.15); pointer-events:none; }
+
+/* ── Derived params ── */
+.derived-grid {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:0; padding:8px 12px;
+}
+.dparam { padding:4px 6px; }
+.dparam-key { font-size:8px; letter-spacing:1px; color:var(--dim); text-transform:uppercase; margin-bottom:2px; }
+.dparam-val { font-size:13px; color:var(--violet); font-family:var(--head); font-weight:700; }
+.dparam-val.cyan  { color:var(--cyan); }
+.dparam-val.green { color:var(--green); }
+.dparam-val.amber { color:var(--amber); }
+
+/* ── Transmit button ── */
+.transmit-wrap { padding:10px 12px; }
+.transmit-btn {
+  width:100%; padding:8px;
+  background:transparent; border:1px solid var(--violet);
+  color:var(--violet); font-family:var(--head); font-size:9px; letter-spacing:2px;
+  cursor:pointer; border-radius:2px; text-transform:uppercase;
+  transition:all 0.2s;
+}
+.transmit-btn:hover { background:rgba(176,106,255,0.12); box-shadow:0 0 16px rgba(176,106,255,0.3); }
+.transmit-btn:active { transform:scale(0.98); }
+.transmit-btn.active { background:rgba(176,106,255,0.2); color:#fff; box-shadow:0 0 20px rgba(176,106,255,0.5); border-color:#fff; animation:btn-pulse 1s ease infinite; }
+@keyframes btn-pulse { 0%,100%{box-shadow:0 0 20px rgba(176,106,255,0.5);} 50%{box-shadow:0 0 35px rgba(176,106,255,0.9);} }
+
+/* ── Canvas center ── */
+#cv-wrap {
+  position:relative; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 50%, rgba(10,5,28,0.7) 0%, var(--bg) 80%);
+}
+#cv-wrap canvas { display:block; width:100%; height:100%; }
+
+/* ── Overlays ── */
+.cv-overlay {
+  position:absolute; pointer-events:none;
+  font-family:var(--head); font-size:8px; letter-spacing:2px; text-transform:uppercase;
+}
+#cv-tl { top:12px; left:14px; color:var(--dim); }
+#cv-tr { top:12px; right:14px; text-align:right; }
+#cv-bl { bottom:12px; left:14px; color:var(--dim); }
+#cv-br { bottom:12px; right:14px; text-align:right; }
+.cv-label { color:var(--dim); }
+.cv-val   { color:var(--violet); }
+
+.phase-badge {
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  font-family:var(--head); font-size:16px; letter-spacing:4px;
+  color:#fff; text-shadow:0 0 30px rgba(176,106,255,0.9), 0 0 60px rgba(0,220,255,0.6);
+  opacity:0; pointer-events:none;
+  transition:opacity 0.6s;
+}
+.phase-badge.show { opacity:1; }
+
+/* ── Resonance ── */
+.phase-list { padding:8px 12px; }
+.phase-item {
+  display:flex; align-items:center; gap:8px; padding:4px 0;
+  border-bottom:1px solid rgba(0,220,255,0.04);
+  font-size:9px; color:var(--dim);
+  transition:color 0.3s;
+}
+.phase-item.active { color:var(--green); }
+.phase-item.done   { color:var(--dim); text-decoration:line-through; }
+.phase-num { font-family:var(--head); font-size:8px; color:var(--border-b); width:14px; flex-shrink:0; }
+.phase-item.active .phase-num { color:var(--green); }
+
+.delta-section { padding:8px 12px; }
+.delta-label { font-size:9px; color:var(--dim); letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; display:flex; justify-content:space-between; }
+.delta-val { color:var(--cyan); }
+.delta-track { height:8px; background:rgba(255,255,255,0.06); border-radius:4px; overflow:hidden; position:relative; }
+.delta-fill { height:100%; border-radius:4px; transition:width 0.4s ease; background:linear-gradient(90deg,var(--green),rgba(0,220,255,0.8)); }
+.delta-invert { background:linear-gradient(90deg,var(--red),var(--amber)); }
+
+.resonance-mini { padding:8px 12px 10px; display:flex; gap:8px; align-items:center; }
+.mini-knot { flex:1; height:56px; border:1px solid var(--border); border-radius:3px; overflow:hidden; position:relative; background:rgba(0,0,0,0.4); }
+.mini-label { position:absolute; bottom:3px; left:50%; transform:translateX(-50%); font-size:8px; color:var(--dim); letter-spacing:1px; white-space:nowrap; }
+.mini-canvas { display:block; width:100%; height:100%; }
+.mini-sep { font-size:16px; color:var(--border-b); padding:0 2px; align-self:center; }
+
+/* ── Fluid Semantics ── */
+.fluid-row { padding:7px 12px; border-bottom:1px solid rgba(0,220,255,0.04); }
+.fluid-top { display:flex; justify-content:space-between; margin-bottom:4px; }
+.fluid-label { font-size:9px; letter-spacing:1px; color:var(--dim); text-transform:uppercase; }
+.fluid-val { font-size:10px; color:var(--amber); }
+.effect-tag { font-size:8px; color:var(--dim); margin-top:3px; font-style:italic; padding:2px 4px; background:rgba(255,255,255,0.03); border-radius:2px; }
+
+/* ── Lock state ── */
+.lock-display { padding:10px 12px; text-align:center; }
+.lock-ring {
+  width:52px; height:52px; border-radius:50%;
+  border:2px solid var(--border); margin:0 auto 6px;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--head); font-size:9px; color:var(--dim);
+  transition:all 0.5s;
+}
+.lock-ring.locked { border-color:var(--green); box-shadow:0 0 20px rgba(0,255,176,0.4); color:var(--green); animation:lock-pulse 2s ease infinite; }
+@keyframes lock-pulse { 0%,100%{box-shadow:0 0 20px rgba(0,255,176,0.4);} 50%{box-shadow:0 0 40px rgba(0,255,176,0.7);} }
+.lock-label { font-size:9px; color:var(--dim); letter-spacing:1px; text-transform:uppercase; }
+
+.scroll-col { flex:1; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--border) transparent; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="hdr">
+    <h1>PHENOMENOLOGICAL SYMBOLOGY ENGINE</h1>
+    <div class="hdr-right">
+      <div class="hdr-tag">TMFT v1.0</div>
+      <div class="hdr-tag">PHASE: <b id="sys-phase">IDLE</b></div>
+      <div class="hdr-tag">Δ MEANING: <b id="sys-delta">—</b></div>
+    </div>
+  </header>
+
+  <div id="body">
+    <!-- LEFT: Cognitive Primitives -->
+    <div class="col">
+      <div class="section">
+        <div class="sec-head">Phenomenological Vector Space <span>5-AXIS</span></div>
+        <div id="prim-sliders">
+
+          <div class="prim-row">
+            <div class="prim-top">
+              <div class="prim-label">Vectoral Force</div>
+              <div class="prim-val" id="v-VF">0.00</div>
+            </div>
+            <div class="prim-slider-wrap">
+              <input type="range" id="sl-VF" min="-100" max="100" value="0" class="green">
+              <div class="zero-line"></div>
+            </div>
+          </div>
+
+          <div class="prim-row">
+            <div class="prim-top">
+              <div class="prim-label">Temporal Flow</div>
+              <div class="prim-val" id="v-TF">0.00</div>
+            </div>
+            <div class="prim-slider-wrap">
+              <input type="range" id="sl-TF" min="-100" max="100" value="0">
+              <div class="zero-line"></div>
+            </div>
+          </div>
+
+          <div class="prim-row">
+            <div class="prim-top">
+              <div class="prim-label">Boundary Tension</div>
+              <div class="prim-val" id="v-BT">0.00</div>
+            </div>
+            <div class="prim-slider-wrap">
+              <input type="range" id="sl-BT" min="-100" max="100" value="0" class="amber">
+              <div class="zero-line"></div>
+            </div>
+          </div>
+
+          <div class="prim-row">
+            <div class="prim-top">
+              <div class="prim-label">Arousal / Intensity</div>
+              <div class="prim-val" id="v-AI">0.00</div>
+            </div>
+            <div class="prim-slider-wrap">
+              <input type="range" id="sl-AI" min="-100" max="100" value="0">
+              <div class="zero-line"></div>
+            </div>
+          </div>
+
+          <div class="prim-row">
+            <div class="prim-top">
+              <div class="prim-label">Equilibrium</div>
+              <div class="prim-val" id="v-EQ">0.00</div>
+            </div>
+            <div class="prim-slider-wrap">
+              <input type="range" id="sl-EQ" min="-100" max="100" value="0">
+              <div class="zero-line"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="sec-head">Derived TMFT Parameters</div>
+        <div class="derived-grid">
+          <div class="dparam">
+            <div class="dparam-key">K  complexity</div>
+            <div class="dparam-val cyan" id="dp-K">—</div>
+          </div>
+          <div class="dparam">
+            <div class="dparam-key">f  oscillation</div>
+            <div class="dparam-val green" id="dp-f">—</div>
+          </div>
+          <div class="dparam">
+            <div class="dparam-key">g  genus</div>
+            <div class="dparam-val amber" id="dp-g">—</div>
+          </div>
+          <div class="dparam">
+            <div class="dparam-key">W  chrom.phase</div>
+            <div class="dparam-val" id="dp-W">—</div>
+          </div>
+          <div class="dparam">
+            <div class="dparam-key">p  winding</div>
+            <div class="dparam-val cyan" id="dp-p">—</div>
+          </div>
+          <div class="dparam">
+            <div class="dparam-key">q  winding</div>
+            <div class="dparam-val cyan" id="dp-q">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="transmit-wrap">
+        <button class="transmit-btn" id="transmit-btn" onclick="triggerResonance()">
+          ◈ Transmit Symbol
+        </button>
+      </div>
+
+      <!-- Fluid Semantics -->
+      <div class="section">
+        <div class="sec-head">Fluid Semantics <span>CONTEXTUAL MOD</span></div>
+
+        <div class="fluid-row">
+          <div class="fluid-top">
+            <div class="fluid-label">Social Density (Ds)</div>
+            <div class="fluid-val" id="v-Ds">0.00</div>
+          </div>
+          <input type="range" id="sl-Ds" min="0" max="100" value="0">
+          <div class="effect-tag" id="fx-Ds">No lexical flattening</div>
+        </div>
+
+        <div class="fluid-row">
+          <div class="fluid-top">
+            <div class="fluid-label">Environmental Urgency (Ue)</div>
+            <div class="fluid-val" id="v-Ue">0.00</div>
+          </div>
+          <input type="range" id="sl-Ue" min="0" max="100" value="0">
+          <div class="effect-tag" id="fx-Ue">Normal transmission rate</div>
+        </div>
+
+        <div class="fluid-row">
+          <div class="fluid-top">
+            <div class="fluid-label">Emotional Proximity (Pe)</div>
+            <div class="fluid-val" id="v-Pe">0.00</div>
+          </div>
+          <input type="range" id="sl-Pe" min="0" max="100" value="0">
+          <div class="effect-tag" id="fx-Pe">Public semantics active</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER: Three.js Canvas -->
+    <div id="cv-wrap">
+      <canvas id="main-canvas"></canvas>
+
+      <div class="cv-overlay" id="cv-tl">
+        <div>HOPFION SYMBOL</div>
+        <div id="cv-knot-id" style="color:var(--violet);margin-top:3px">T(2,3)</div>
+      </div>
+      <div class="cv-overlay" id="cv-tr">
+        <div class="cv-label">CHROMATIC PHASE</div>
+        <div class="cv-val" id="cv-W-val">W = 0.00</div>
+        <div class="cv-label" style="margin-top:4px">GENUS</div>
+        <div class="cv-val" id="cv-g-val">g = 0</div>
+      </div>
+      <div class="cv-overlay" id="cv-bl">
+        <div>MAGNETO-FLUIDIC FIELD</div>
+        <div>drag to rotate</div>
+      </div>
+      <div class="cv-overlay" id="cv-br">
+        <div class="cv-label">PULSE FREQ</div>
+        <div class="cv-val" id="cv-f-val">0.40 Hz</div>
+      </div>
+
+      <div class="phase-badge" id="phase-badge">HARMONIC LOCK</div>
+    </div>
+
+    <!-- RIGHT: Resonance Protocol -->
+    <div class="col" style="border-left:1px solid var(--border); border-right:none;">
+      <div class="section">
+        <div class="sec-head">Resonance Protocol <span id="res-phase-tag">IDLE</span></div>
+
+        <div class="resonance-mini">
+          <div class="mini-knot">
+            <canvas class="mini-canvas" id="mini-sender"></canvas>
+            <div class="mini-label">SENDER</div>
+          </div>
+          <div class="mini-sep">⇌</div>
+          <div class="mini-knot">
+            <canvas class="mini-canvas" id="mini-receiver"></canvas>
+            <div class="mini-label">RECEIVER</div>
+          </div>
+        </div>
+
+        <div class="delta-section">
+          <div class="delta-label">
+            MEANING DELTA
+            <span class="delta-val" id="delta-pct">—</span>
+          </div>
+          <div class="delta-track">
+            <div class="delta-fill delta-invert" id="delta-bar" style="width:0%"></div>
+          </div>
+        </div>
+
+        <div class="phase-list">
+          <div class="phase-item" id="ph-0"><span class="phase-num">I</span>INDUCTION — sender projects state</div>
+          <div class="phase-item" id="ph-1"><span class="phase-num">II</span>REFLECTION — receiver emits feedback</div>
+          <div class="phase-item" id="ph-2"><span class="phase-num">III</span>GRADIENT EVALUATION</div>
+          <div class="phase-item" id="ph-3"><span class="phase-num">IV</span>RECURSIVE REFINEMENT</div>
+        </div>
+
+        <div class="lock-display">
+          <div class="lock-ring" id="lock-ring">SYNC</div>
+          <div class="lock-label" id="lock-label">Awaiting transmission</div>
+        </div>
+      </div>
+
+      <!-- Resonance log -->
+      <div class="section scroll-col">
+        <div class="sec-head">Harmonic Log <span id="log-count">0 events</span></div>
+        <div id="harmonic-log" style="padding:4px 0;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ── State ──────────────────────────────────────────────
+const prim = { VF:0, TF:0, BT:0, AI:0, EQ:0 };
+const fluid = { Ds:0, Ue:0, Pe:0 };
+const derived = { p:2, q:3, f:0.4, g:0, W:0, K:0 };
+const smoothed = { p:2, q:3 }; // lerped p/q for smooth morphing
+
+let resonance = {
+  active:false, phase:-1, progress:0,
+  senderVec:[0,0,0,0,0], receiverVec:[0,0,0,0,0],
+  delta:1, converging:false,
+};
+let logEvents = [], logCount = 0;
+
+// ── Slider wiring ──────────────────────────────────────
+['VF','TF','BT','AI','EQ'].forEach(k => {
+  const el = document.getElementById('sl-'+k);
+  el.addEventListener('input', () => {
+    prim[k] = el.value / 100;
+    document.getElementById('v-'+k).textContent = prim[k].toFixed(2);
+    updateDerived();
+  });
+});
+['Ds','Ue','Pe'].forEach(k => {
+  const el = document.getElementById('sl-'+k);
+  el.addEventListener('input', () => {
+    fluid[k] = el.value / 100;
+    document.getElementById('v-'+k).textContent = fluid[k].toFixed(2);
+    updateFluidEffects();
+    updateDerived();
+  });
+});
+
+function updateFluidEffects() {
+  const Ds = fluid.Ds, Ue = fluid.Ue, Pe = fluid.Pe;
+  document.getElementById('fx-Ds').textContent =
+    Ds < 0.2 ? 'No lexical flattening' :
+    Ds < 0.5 ? 'Slight complexity reduction' :
+    Ds < 0.8 ? 'Lexical flattening active' : 'Max compression — shared minimum';
+  document.getElementById('fx-Ue').textContent =
+    Ue < 0.2 ? 'Normal transmission rate' :
+    Ue < 0.5 ? 'Moderate pulse acceleration' :
+    Ue < 0.8 ? 'Radical compression active' : 'CRITICAL — raw semiotic impact only';
+  document.getElementById('fx-Pe').textContent =
+    Pe < 0.2 ? 'Public semantics active' :
+    Pe < 0.5 ? 'Partial idiosyncratic shift' :
+    Pe < 0.8 ? 'Idiosyncratic expansion' : 'Fully private meaning space';
+}
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function lerp(a, b, t) { return a + (b-a)*t; }
+
+function updateDerived() {
+  const { VF, TF, BT, AI, EQ } = prim;
+  const { Ds, Ue, Pe } = fluid;
+
+  const entropy = (Math.abs(VF)*0.25 + Math.abs(TF)*0.2 + Math.abs(BT)*0.3 + Math.abs(AI)*0.15 + Math.abs(1-EQ)*0.1);
+  const H = clamp(entropy, 0, 1);
+
+  // p,q winding — modulated by fluid
+  let baseP = clamp(2 + Math.round(Math.abs(AI) * 2 + Pe * 1.5 - Ds * 1), 2, 6);
+  let baseQ = clamp(3 + Math.round(H * 4 + Pe * 1 - Ds * 1.5), 3, 9);
+  if (Ue > 0.7) { baseP = 2; baseQ = 3; } // radical compression
+
+  derived.p = baseP; derived.q = baseQ;
+  derived.K = parseFloat((H * 4.5 + 0.5).toFixed(2));
+  derived.f = parseFloat(clamp((0.35 + Math.abs(AI) * 1.5) * (1 + Ue * 2), 0.1, 5).toFixed(2));
+  derived.g = clamp(Math.round(Math.abs(TF) * 2 + Math.max(0, -EQ)), 0, 3);
+  derived.W = parseFloat(EQ.toFixed(3));
+
+  // Chromatic hue: EQ < 0 → amber/red, EQ > 0 → cyan/violet
+  const wHue = EQ < 0
+    ? `rgba(255,${Math.round(80+EQ*-80)},30,1)`
+    : `rgba(${Math.round(100-EQ*80)},${Math.round(200+EQ*55)},255,1)`;
+  document.getElementById('dp-W').style.color = wHue;
+
+  // Update HUD
+  document.getElementById('dp-K').textContent = derived.K.toFixed(2);
+  document.getElementById('dp-f').textContent = derived.f.toFixed(2) + ' Hz';
+  document.getElementById('dp-g').textContent = 'g=' + derived.g;
+  document.getElementById('dp-W').textContent = derived.W.toFixed(3);
+  document.getElementById('dp-p').textContent = derived.p;
+  document.getElementById('dp-q').textContent = derived.q;
+  document.getElementById('cv-knot-id').textContent = `T(${derived.p},${derived.q})`;
+  document.getElementById('cv-W-val').textContent = `W = ${derived.W.toFixed(2)}`;
+  document.getElementById('cv-g-val').textContent = `g = ${derived.g}`;
+  document.getElementById('cv-f-val').textContent = derived.f.toFixed(2) + ' Hz';
+  document.getElementById('sys-phase').textContent = resonance.active ? 'TRANSMIT' : 'IDLE';
+}
+updateDerived();
+
+// ═══════════════════════════════════════════════════════
+//  THREE.JS SETUP
+// ═══════════════════════════════════════════════════════
+const cvWrap = document.getElementById('cv-wrap');
+const canvas = document.getElementById('main-canvas');
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x000000, 0);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.3;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+camera.position.set(0, 0, 8);
+
+function resizeCv() {
+  const W = cvWrap.offsetWidth, H = cvWrap.offsetHeight;
+  renderer.setSize(W, H);
+  camera.aspect = W / H;
+  camera.updateProjectionMatrix();
+}
+resizeCv();
+window.addEventListener('resize', resizeCv);
+
+// ── Lighting ──
+scene.add(new THREE.AmbientLight(0x0a0520, 4));
+const lA = new THREE.PointLight(0x7733ff, 8, 20); lA.position.set(4, 3, 5); scene.add(lA);
+const lB = new THREE.PointLight(0x00ddff, 6, 18); lB.position.set(-4,-2, 4); scene.add(lB);
+const lC = new THREE.PointLight(0xff6688, 3, 14); lC.position.set(0, 5,-3); scene.add(lC);
+
+// ── Iridescent Shader Material ──
+const knotVS = `
+  varying vec3 vNormal;
+  varying vec3 vViewPos;
+  varying float vUv;
+  void main() {
+    vNormal = normalMatrix * normal;
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vViewPos = -mv.xyz;
+    vUv = uv.x;
+    gl_Position = projectionMatrix * mv;
+  }
+`;
+const knotFS = `
+  uniform float time;
+  uniform float chrW;   // chromatic phase -1..1
+  uniform float arousal;
+  uniform float boundT; // boundary tension
+  uniform float opacity;
+  varying vec3 vNormal;
+  varying vec3 vViewPos;
+  varying float vUv;
+
+  vec3 hsl2rgb(float h, float s, float l) {
+    h = mod(h, 1.0);
+    float c = (1.0 - abs(2.0*l-1.0))*s;
+    float x = c*(1.0-abs(mod(h*6.0,2.0)-1.0));
+    float m = l-c*0.5;
+    vec3 r;
+    if      (h<1./6.) r=vec3(c,x,0.);
+    else if (h<2./6.) r=vec3(x,c,0.);
+    else if (h<3./6.) r=vec3(0.,c,x);
+    else if (h<4./6.) r=vec3(0.,x,c);
+    else if (h<5./6.) r=vec3(x,0.,c);
+    else              r=vec3(c,0.,x);
+    return r+m;
+  }
+
+  void main() {
+    vec3 N = normalize(vNormal);
+    vec3 V = normalize(vViewPos);
+    float fr = pow(1.0 - max(0.0, dot(V, N)), 2.2);
+
+    // Base hue from chromatic phase W:
+    // W=-1 → red(0.0), W=0 → cyan(0.5), W=1 → violet(0.72)
+    float baseH = 0.5 + chrW * 0.22;
+
+    // Iridescent: hue shifts with fresnel + position along tube
+    float iriShift = fr * 0.18 + sin(vUv * 12.566 + time * 0.4) * 0.04;
+    iriShift += abs(boundT) * fr * 0.12;
+    float hue = baseH + iriShift;
+
+    float sat = 0.75 + abs(arousal) * 0.22;
+    float lit = 0.28 + fr * 0.45 + abs(arousal) * 0.08;
+
+    vec3 col = hsl2rgb(hue, sat, lit);
+
+    // Rim glow in complementary hue
+    vec3 rim = hsl2rgb(hue + 0.08, 1.0, 0.65);
+    col += rim * fr * 0.9;
+
+    // Hot-spot specular
+    vec3 halfV = normalize(V + vec3(0.6, 0.8, 0.3));
+    float spec = pow(max(0.0, dot(N, halfV)), 28.0);
+    col += spec * 0.8;
+
+    gl_FragColor = vec4(col, opacity);
+  }
+`;
+
+const knotMat = new THREE.ShaderMaterial({
+  vertexShader: knotVS, fragmentShader: knotFS,
+  uniforms: {
+    time:   { value: 0 },
+    chrW:   { value: 0 },
+    arousal:{ value: 0 },
+    boundT: { value: 0 },
+    opacity:{ value: 1 },
+  },
+  side: THREE.FrontSide,
+});
+
+// Ghost knot material (receiver)
+const ghostMat = new THREE.MeshBasicMaterial({
+  color: 0x9944ff, wireframe: true, transparent: true, opacity: 0.0,
+});
+
+// ── Torus knot builder ──
+let knotMesh = null, ghostMesh = null;
+let lastBuiltP = -1, lastBuiltQ = -1;
+
+function buildKnotCurve(p, q, R=2.0, r=0.7, steps=360) {
+  const pts = [];
+  for (let i=0; i<=steps; i++) {
+    const t = (i/steps)*Math.PI*2;
+    const x = (R + r*Math.cos(q*t)) * Math.cos(p*t);
+    const y = (R + r*Math.cos(q*t)) * Math.sin(p*t);
+    const z = r * Math.sin(q*t);
+    if (!isFinite(x)||!isFinite(y)||!isFinite(z)) continue;
+    pts.push(new THREE.Vector3(x, y, z));
+  }
+  if (pts.length < 4) pts.push(new THREE.Vector3(0,0,0));
+  return new THREE.CatmullRomCurve3(pts, true);
+}
+
+function rebuildKnot(p, q, isGhost=false) {
+  const curve = buildKnotCurve(p, q);
+  const geo = new THREE.TubeGeometry(curve, isGhost ? 160 : 360, isGhost ? 0.1 : 0.14, isGhost ? 6 : 10, true);
+  const mat = isGhost ? ghostMat : knotMat;
+  const mesh = new THREE.Mesh(geo, mat);
+  return mesh;
+}
+
+function refreshMainKnot() {
+  const p = Math.round(smoothed.p), q = Math.round(smoothed.q);
+  if (p === lastBuiltP && q === lastBuiltQ) return;
+  lastBuiltP = p; lastBuiltQ = q;
+  if (knotMesh) { knotMesh.geometry.dispose(); scene.remove(knotMesh); }
+  knotMesh = rebuildKnot(p, q, false);
+  scene.add(knotMesh);
+}
+function refreshGhostKnot(p, q) {
+  if (ghostMesh) { ghostMesh.geometry.dispose(); scene.remove(ghostMesh); }
+  ghostMesh = rebuildKnot(p, q, true);
+  ghostMesh.position.set(0.4, 0.3, 0);
+  scene.add(ghostMesh);
+}
+refreshMainKnot();
+
+// ── Particle Halo ──
+const PART_N = 900;
+const partPositions = new Float32Array(PART_N * 3);
+const partColors = new Float32Array(PART_N * 3);
+const partPhases = new Float32Array(PART_N);
+for (let i=0; i<PART_N; i++) {
+  const th = Math.acos(2*Math.random()-1), ph2 = Math.random()*Math.PI*2;
+  const rad = 2.2 + Math.random()*2.2;
+  partPositions[i*3]   = rad*Math.sin(th)*Math.cos(ph2);
+  partPositions[i*3+1] = rad*Math.sin(th)*Math.sin(ph2);
+  partPositions[i*3+2] = rad*Math.cos(th);
+  partPhases[i] = Math.random()*Math.PI*2;
+}
+const partGeo = new THREE.BufferGeometry();
+partGeo.setAttribute('position', new THREE.BufferAttribute(partPositions, 3));
+partGeo.setAttribute('color',    new THREE.BufferAttribute(partColors, 3));
+const partMat = new THREE.PointsMaterial({
+  size:0.04, vertexColors:true,
+  transparent:true, opacity:0.7,
+  blending:THREE.AdditiveBlending, depthWrite:false,
+});
+const particles = new THREE.Points(partGeo, partMat);
+scene.add(particles);
+
+function updateParticles(t, W_val, arousal_val) {
+  const col = new THREE.Color();
+  const hBase = 0.5 + W_val * 0.22;
+  for (let i=0; i<PART_N; i++) {
+    const ph = partPhases[i];
+    const brightness = 0.3 + 0.5*(Math.sin(t*derived.f*0.8 + ph)*0.5+0.5) * (0.4 + Math.abs(arousal_val)*0.6);
+    col.setHSL((hBase + ph*0.08)%1, 0.9, brightness * 0.7);
+    partColors[i*3]=col.r; partColors[i*3+1]=col.g; partColors[i*3+2]=col.b;
+  }
+  partGeo.attributes.color.needsUpdate = true;
+}
+
+// ── Mouse drag rotation ──
+let isDrag=false, prevMX=0, prevMY=0, autoRotY=0, manualRotX=0, manualRotY=0;
+canvas.addEventListener('mousedown', e=>{ isDrag=true; prevMX=e.clientX; prevMY=e.clientY; });
+window.addEventListener('mouseup',   ()=>{ isDrag=false; });
+window.addEventListener('mousemove', e=>{
+  if (!isDrag) return;
+  manualRotY += (e.clientX-prevMX)*0.012;
+  manualRotX += (e.clientY-prevMY)*0.008;
+  manualRotX = clamp(manualRotX, -1.2, 1.2);
+  prevMX=e.clientX; prevMY=e.clientY;
+});
+
+// ═══════════════════════════════════════════════════════
+//  RESONANCE PROTOCOL
+// ═══════════════════════════════════════════════════════
+const phaseNames = ['INDUCTION','REFLECTION','GRADIENT EVAL','RECURSIVE REF'];
+let resPhaseTimer = 0;
+
+function triggerResonance() {
+  if (resonance.active) return;
+  resonance.active = true;
+  resonance.phase = 0;
+  resonance.progress = 0;
+  resonance.senderVec = [prim.VF, prim.TF, prim.BT, prim.AI, prim.EQ];
+  // Receiver starts far from sender
+  resonance.receiverVec = resonance.senderVec.map(v => v + (Math.random()-0.5)*1.4);
+  resonance.delta = vectorDelta(resonance.senderVec, resonance.receiverVec);
+  resonance.converging = false;
+  resPhaseTimer = 0;
+
+  refreshGhostKnot(
+    clamp(derived.p + Math.round(Math.random()*2-1), 2, 6),
+    clamp(derived.q + Math.round(Math.random()*3-1), 3, 9)
+  );
+  ghostMat.opacity = 0.35;
+
+  document.getElementById('transmit-btn').classList.add('active');
+  document.getElementById('sys-phase').textContent = 'TRANSMIT';
+  setPhaseUI(0);
+  startMiniAnimation();
+}
+
+function vectorDelta(a, b) {
+  let sum = 0;
+  for (let i=0; i<a.length; i++) sum += (a[i]-b[i])**2;
+  return Math.min(1, Math.sqrt(sum/a.length));
+}
+
+function setPhaseUI(phase) {
+  for (let i=0; i<4; i++) {
+    const el = document.getElementById('ph-'+i);
+    el.className = 'phase-item' + (i<phase ? ' done' : i===phase ? ' active' : '');
+  }
+  document.getElementById('res-phase-tag').textContent = phaseNames[phase] || 'IDLE';
+}
+
+function updateResonance(dt) {
+  resPhaseTimer += dt;
+
+  const phaseDurations = [1.4, 1.2, 1.0, 1.8];
+  const dur = phaseDurations[resonance.phase] || 1.5;
+
+  // Recursive convergence in phase 3
+  if (resonance.phase === 3) {
+    const t2 = resPhaseTimer / dur;
+    for (let i=0; i<5; i++) {
+      resonance.receiverVec[i] = lerp(resonance.receiverVec[i], resonance.senderVec[i], dt * 1.2);
+    }
+    resonance.delta = vectorDelta(resonance.senderVec, resonance.receiverVec);
+    // Update ghost knot toward main
+    if (ghostMesh) {
+      ghostMesh.position.lerp(new THREE.Vector3(0,0,0), dt * 0.8);
+    }
+  }
+
+  if (resPhaseTimer >= dur) {
+    resPhaseTimer = 0;
+    resonance.phase++;
+    if (resonance.phase < 4) setPhaseUI(resonance.phase);
+    if (resonance.phase >= 4) finalizeResonance();
+  }
+
+  // Update delta display
+  const pct = Math.round(resonance.delta * 100);
+  document.getElementById('delta-pct').textContent = pct + '%';
+  document.getElementById('delta-bar').style.width = pct + '%';
+  document.getElementById('sys-delta').textContent = resonance.delta.toFixed(3);
+  updateMiniKnots();
+}
+
+function finalizeResonance() {
+  const locked = resonance.delta < 0.18;
+  resonance.active = false;
+  resonance.phase = -1;
+  document.getElementById('transmit-btn').classList.remove('active');
+  document.getElementById('sys-phase').textContent = locked ? 'LOCKED' : 'IDLE';
+  document.getElementById('res-phase-tag').textContent = locked ? 'HARMONIC LOCK' : 'IDLE';
+
+  const ring = document.getElementById('lock-ring');
+  const label = document.getElementById('lock-label');
+  if (locked) {
+    ring.className = 'lock-ring locked';
+    ring.textContent = '⬡';
+    label.textContent = 'Harmonic Lock achieved';
+    label.style.color = 'var(--green)';
+    const badge = document.getElementById('phase-badge');
+    badge.classList.add('show');
+    setTimeout(()=>badge.classList.remove('show'), 2600);
+    addLogEvent('HARMONIC LOCK', resonance.delta, true);
+    ghostMat.opacity = 0;
+  } else {
+    ring.className = 'lock-ring';
+    ring.textContent = 'SYNC';
+    label.textContent = `Δ too large (${resonance.delta.toFixed(3)}) — retransmit`;
+    label.style.color = 'var(--amber)';
+    addLogEvent('LOCK FAILED', resonance.delta, false);
+    ghostMat.opacity = 0;
+  }
+}
+
+function addLogEvent(event, delta, success) {
+  logCount++;
+  const entry = {
+    id: logCount, event, delta, success,
+    p: derived.p, q: derived.q, W: derived.W,
+  };
+  logEvents.unshift(entry);
+  if (logEvents.length > 30) logEvents.pop();
+  renderLog();
+  document.getElementById('log-count').textContent = logEvents.length + ' events';
+}
+
+function renderLog() {
+  const el = document.getElementById('harmonic-log');
+  el.innerHTML = logEvents.map(e => `
+    <div style="padding:5px 12px; border-bottom:1px solid rgba(0,220,255,0.05); font-size:9px; animation:fadeIn 0.4s ease;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
+        <span style="color:${e.success?'var(--green)':'var(--amber)'}">${e.success?'✓':'✗'} ${e.event}</span>
+        <span style="color:var(--dim)">#${String(e.id).padStart(3,'0')}</span>
+      </div>
+      <div style="color:var(--dim);display:flex;gap:10px;">
+        <span>T(${e.p},${e.q})</span>
+        <span>W=${e.W.toFixed(2)}</span>
+        <span style="color:${e.delta<0.2?'var(--green)':'var(--amber)'}">Δ=${e.delta.toFixed(3)}</span>
+      </div>
+    </div>`).join('');
+}
+
+// ── Mini Knot Canvases (2D Lissajous projection) ──
+const miniSenderCtx   = document.getElementById('mini-sender').getContext('2d');
+const miniReceiverCtx = document.getElementById('mini-receiver').getContext('2d');
+
+function drawMiniKnot(ctx, p, q, col, t_offset=0) {
+  const el = ctx.canvas;
+  const W2 = el.offsetWidth || 100, H2 = el.offsetHeight || 56;
+  el.width = W2; el.height = H2;
+  ctx.clearRect(0,0,W2,H2);
+  ctx.strokeStyle = col; ctx.lineWidth = 1.2;
+  ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  const cx=W2/2, cy=H2/2, rx=W2*0.38, ry=H2*0.38;
+  const steps=200;
+  for (let i=0; i<=steps; i++) {
+    const t3=(i/steps)*Math.PI*2+t_offset;
+    const x2 = cx + rx*Math.cos(p*t3)*Math.cos(t3) + ry*0.3*Math.sin((p+1)*t3);
+    const y2 = cy + ry*Math.sin(q*t3)*Math.cos(t3*0.7+0.5);
+    if (!isFinite(x2)||!isFinite(y2)) continue;
+    i===0 ? ctx.moveTo(x2,y2) : ctx.lineTo(x2,y2);
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+let miniT = 0;
+function startMiniAnimation() {}
+function updateMiniKnots() {
+  miniT += 0.04;
+  const rcvP = clamp(Math.round(derived.p + (resonance.receiverVec?.[3]||0)), 2, 6);
+  const rcvQ = clamp(Math.round(derived.q + (resonance.receiverVec?.[4]||0)*0.5), 3, 9);
+  const sndHue = 0.5 + derived.W * 0.22;
+  drawMiniKnot(miniSenderCtx, derived.p, derived.q, hslStr(sndHue, 0.9, 0.6), miniT);
+  drawMiniKnot(miniReceiverCtx, rcvP, rcvQ, hslStr((sndHue+0.15)%1, 0.8, 0.5), miniT+0.5);
+}
+
+function hslStr(h,s,l) {
+  const c = (1-Math.abs(2*l-1))*s;
+  const x = c*(1-Math.abs(((h*6)%2)-1));
+  const m=l-c/2;
+  let r,g,b;
+  const h6=h*6;
+  if(h6<1){r=c;g=x;b=0}else if(h6<2){r=x;g=c;b=0}else if(h6<3){r=0;g=c;b=x}
+  else if(h6<4){r=0;g=x;b=c}else if(h6<5){r=x;g=0;b=c}else{r=c;g=0;b=x}
+  return `rgb(${Math.round((r+m)*255)},${Math.round((g+m)*255)},${Math.round((b+m)*255)})`;
+}
+
+// ═══════════════════════════════════════════════════════
+//  ANIMATION LOOP
+// ═══════════════════════════════════════════════════════
+let prevT = performance.now() / 1000;
+let clock = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const now = performance.now() / 1000;
+  const dt = Math.min(now - prevT, 0.05);
+  prevT = now;
+  clock += dt;
+
+  // Smooth param lerp
+  smoothed.p = lerp(smoothed.p, derived.p, dt * 2.5);
+  smoothed.q = lerp(smoothed.q, derived.q, dt * 2.5);
+
+  // Rebuild knot if needed (throttled)
+  refreshMainKnot();
+
+  // Pulse scale from oscillation frequency
+  const pulse = 1.0 + 0.055 * Math.sin(clock * derived.f * Math.PI * 2);
+  if (knotMesh && isFinite(pulse)) knotMesh.scale.setScalar(pulse);
+
+  // Auto + manual rotation
+  autoRotY += dt * 0.25;
+  if (knotMesh) {
+    knotMesh.rotation.y = autoRotY + manualRotY;
+    knotMesh.rotation.x = 0.3 + manualRotX;
+    knotMesh.rotation.z = clock * 0.06;
+  }
+  if (ghostMesh) {
+    ghostMesh.rotation.y = autoRotY + manualRotY + 0.3;
+    ghostMesh.rotation.x = 0.3 + manualRotX;
+  }
+  particles.rotation.y = autoRotY * 0.2 + manualRotY * 0.1;
+
+  // Update shader uniforms
+  knotMat.uniforms.time.value   = clock;
+  knotMat.uniforms.chrW.value   = derived.W;
+  knotMat.uniforms.arousal.value = prim.AI;
+  knotMat.uniforms.boundT.value  = prim.BT;
+
+  // Fluid urgency flicker
+  if (fluid.Ue > 0.6) {
+    const flicker = 0.9 + Math.random()*0.1;
+    knotMat.uniforms.opacity.value = flicker;
+  } else {
+    knotMat.uniforms.opacity.value = 1.0;
+  }
+
+  // Update particles
+  updateParticles(clock, derived.W, prim.AI);
+
+  // Resonance update
+  if (resonance.active) updateResonance(dt);
+
+  // Lighting color from W
+  const hW = 0.5 + derived.W * 0.22;
+  const lCol = new THREE.Color().setHSL(hW, 0.9, 0.5);
+  lA.color.lerp(lCol, dt * 1.5);
+  lB.color.lerp(new THREE.Color().setHSL((hW + 0.35) % 1, 0.8, 0.45), dt * 1.5);
+
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>

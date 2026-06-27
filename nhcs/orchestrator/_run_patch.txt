@@ -1,0 +1,49 @@
+    async def run(self, n_concepts: int = 1) -> list[IntegrationFeedback]:
+        feedbacks = []
+        attempts = 0
+        max_attempts = n_concepts * 5
+
+        while len(feedbacks) < n_concepts and attempts < max_attempts:
+            attempts += 1
+            logger.info("── Attempt %d/%d ──────────────────────────────", attempts, max_attempts)
+
+            # Layer 1
+            logger.info("L1: RSE generating candidates…")
+            concept = self._generate_concept()
+            if concept is None:
+                logger.warning("L1: No concept survived pipeline. Retrying.")
+                continue
+            logger.info("L1: Concept %s committed to ledger.", concept.concept_id[:8])
+
+            await self.bus.publish("concept_target", concept)
+
+            # Layer 2
+            logger.info("L2: DigitalTwin stepping concept → PhysicalRealization…")
+            realization = self.twin.step(concept)
+            if not self.airlock.check_physical_integrity(realization):
+                logger.warning("L2: Airlock rejected concept %s.", concept.concept_id[:8])
+                continue
+            logger.info(
+                "L2: Realization OK — error=%.1f%% freq=%.2fHz wl=%.1fnm B=%.3fmT",
+                realization.charge_error_pct, realization.target_frequency_hz,
+                realization.target_wavelength_nm, realization.mean_b_field_mt,
+            )
+            await self.bus.publish("physical_realization", realization)
+
+            # Layer 3
+            logger.info("L3: CRIM loop — %d biometric steps…", self.n_crim_steps)
+            feedback = self._run_crim_loop(concept, realization)
+            feedbacks.append(feedback)
+            await self.bus.publish("integration_feedback", feedback)
+
+            cli_mean = sum(feedback.cli_series) / max(len(feedback.cli_series), 1)
+            logger.info(
+                "✓ Concept %s — BHI=%.4f  SDR=%.4f (conf=%.4f)  CLI_mean=%.4f  IIS_final=%.4f",
+                concept.concept_id[:8],
+                feedback.bhi, feedback.sdr, feedback.sdr_confidence,
+                cli_mean,
+                feedback.iis_series[-1] if feedback.iis_series else 0.0,
+            )
+
+        return feedbacks
+

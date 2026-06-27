@@ -1,0 +1,2 @@
+[console_scripts]
+nhcs-demo = nhcs.orchestrator.digital_twin_demo:main

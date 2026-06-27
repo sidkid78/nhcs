@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: transparent; color: #1a1a2e; font-size: 12px; padding: 16px; }
+h2.sr-only { position: absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; margin-bottom: 14px; }
+.tab {
+  flex: 1; padding: 8px 12px; border-radius: 8px; cursor: pointer;
+  font-size: 11px; font-weight: 700; text-align: center;
+  border: 2px solid transparent; transition: all 0.15s; user-select: none;
+}
+.tab-l2 { background: #ecfdf5; color: #065f46; border-color: #6ee7b7; }
+.tab-l2.active { background: #10b981; color: white; border-color: #10b981; }
+.tab-l3 { background: #fff7ed; color: #7c2d12; border-color: #fdba74; }
+.tab-l3.active { background: #f97316; color: white; border-color: #f97316; }
+
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* Shared stage styles */
+.stage {
+  border-radius: 10px; border: 2px solid transparent;
+  overflow: hidden; margin-bottom: 4px;
+  transition: box-shadow 0.15s;
+}
+.stage:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+.stage-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; cursor: pointer; user-select: none;
+}
+.stage-num {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 800; color: white; flex-shrink: 0;
+}
+.stage-info { flex: 1; }
+.stage-name { font-weight: 700; font-size: 12px; }
+.stage-tag { font-size: 10px; opacity: 0.6; margin-top: 1px; }
+.chevron { font-size: 11px; opacity: 0.4; transition: transform 0.2s; }
+.stage.open .chevron { transform: rotate(180deg); }
+.stage-body { display: none; padding: 0 14px 14px; }
+.stage.open .stage-body { display: block; }
+
+/* Sub components */
+.subcomps { display: flex; flex-direction: column; gap: 7px; margin-top: 6px; }
+.sub {
+  background: rgba(255,255,255,0.7); border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 8px; padding: 8px 11px; cursor: pointer;
+}
+.sub-header { display: flex; align-items: center; justify-content: space-between; }
+.sub-name { font-weight: 700; font-size: 11px; }
+.badge { font-size: 9px; font-weight: 700; border-radius: 4px; padding: 2px 6px; }
+.sub-detail {
+  display: none; font-size: 11px; color: #374151; line-height: 1.55;
+  margin-top: 7px; padding-top: 7px; border-top: 1px solid rgba(0,0,0,0.07);
+}
+.sub.open .sub-detail { display: block; }
+
+/* Flow arrows */
+.flow { display: flex; align-items: center; gap: 8px; padding: 4px 16px; }
+.flow-line { flex: 1; height: 1px; background: #cbd5e1; }
+.flow-pill {
+  font-size: 10px; font-weight: 700; border-radius: 20px;
+  padding: 3px 10px; white-space: nowrap;
+}
+
+/* Formula boxes */
+.formula-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.formula-box {
+  background: rgba(255,255,255,0.8); border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 8px; padding: 9px 11px;
+}
+.formula-title { font-size: 10px; font-weight: 700; color: #065f46; margin-bottom: 4px; }
+.formula-eq { font-size: 11px; font-family: 'Courier New', monospace; color: #1e3a2f; background: #f0fdf4; border-radius: 4px; padding: 3px 6px; margin-bottom: 4px; }
+.formula-ex { font-size: 10px; color: #6b7280; }
+
+/* Hardware specs table */
+.spec-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 8px; }
+.spec-cell {
+  background: rgba(255,255,255,0.7); border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 6px; padding: 7px 9px;
+}
+.spec-key { font-size: 10px; font-weight: 700; color: #374151; }
+.spec-val { font-size: 10px; color: #059669; font-weight: 600; margin-top: 2px; }
+
+/* Solver boxes */
+.solver-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+.solver {
+  background: rgba(255,255,255,0.75); border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 8px; padding: 8px 10px;
+}
+.solver-name { font-size: 10px; font-weight: 800; color: #065f46; margin-bottom: 3px; }
+.solver-lib { font-size: 9px; font-weight: 700; background: #d1fae5; color: #065f46; border-radius: 3px; padding: 1px 5px; margin-bottom: 4px; display: inline-block; }
+.solver-desc { font-size: 10px; color: #4b5563; line-height: 1.45; }
+
+/* Risk callout */
+.risk {
+  background: #fff1f2; border: 1px solid #fca5a5;
+  border-radius: 8px; padding: 8px 11px; margin-top: 8px;
+  font-size: 10px; color: #991b1b; line-height: 1.5;
+}
+.risk-title { font-weight: 800; margin-bottom: 2px; }
+
+/* Regime bar */
+.regime-bar {
+  background: white; border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 8px; padding: 10px 12px; margin-top: 8px;
+}
+.regime-title { font-size: 10px; font-weight: 700; color: #374151; margin-bottom: 6px; }
+.bar-track {
+  position: relative; height: 28px; background: #f1f5f9;
+  border-radius: 6px; overflow: visible; margin-bottom: 4px;
+}
+.bar-zone {
+  position: absolute; top: 0; bottom: 0; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700;
+}
+.zone-danger-l { left: 0; width: 25%; background: #fee2e2; color: #b91c1c; }
+.zone-safe { left: 25%; width: 41.7%; background: #d1fae5; color: #065f46; }
+.zone-danger-r { left: 66.7%; right: 0; background: #fee2e2; color: #b91c1c; }
+.bar-labels { display: flex; justify-content: space-between; font-size: 9px; color: #94a3b8; padding: 0 2px; }
+
+/* Output box */
+.output-box {
+  border-radius: 10px; padding: 12px 14px; margin-top: 10px;
+}
+.output-l2 { background: #ecfdf5; border: 2px solid #10b981; }
+.output-l3 { background: #fff7ed; border: 2px solid #f97316; }
+.output-title { font-weight: 800; font-size: 11px; margin-bottom: 8px; }
+.output-l2 .output-title { color: #065f46; }
+.output-l3 .output-title { color: #9a3412; }
+.output-fields { display: flex; flex-wrap: wrap; gap: 5px; }
+.field-l2 { background: white; border: 1px solid #6ee7b7; border-radius: 5px; padding: 3px 8px; font-size: 10px; font-weight: 600; color: #065f46; }
+.field-l3 { background: white; border: 1px solid #fdba74; border-radius: 5px; padding: 3px 8px; font-size: 10px; font-weight: 600; color: #9a3412; }
+
+/* L3 specific */
+.prime-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 8px; }
+.prime-cat {
+  background: rgba(255,255,255,0.75); border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 7px; padding: 7px 9px;
+}
+.prime-cat-name { font-size: 10px; font-weight: 800; color: #9a3412; margin-bottom: 4px; }
+.prime-cat-item { font-size: 10px; color: #4b5563; line-height: 1.5; }
+
+.bio-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 8px; }
+.bio-card {
+  background: rgba(255,255,255,0.75); border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 8px; padding: 8px 9px; text-align: center;
+}
+.bio-icon { font-size: 20px; margin-bottom: 3px; }
+.bio-name { font-size: 10px; font-weight: 700; }
+.bio-sim { font-size: 9px; color: #6b7280; margin-top: 2px; line-height: 1.4; }
+
+.pid-box {
+  background: rgba(255,255,255,0.75); border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 8px; padding: 9px 11px; margin-top: 8px;
+}
+.pid-title { font-size: 10px; font-weight: 800; color: #c2410c; margin-bottom: 6px; }
+.pid-flow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pid-step {
+  background: #fff7ed; border: 1px solid #fdba74;
+  border-radius: 5px; padding: 4px 8px; font-size: 10px; font-weight: 700; color: #9a3412;
+}
+.pid-arrow { color: #f97316; font-size: 14px; }
+
+/* L2 color theme */
+.l2-stage { background: #f0fdf4; border-color: #86efac; }
+.l2-stage .stage-num { background: #10b981; }
+.l2-badge { background: #d1fae5; color: #065f46; }
+.l2-flow { background: #d1fae5; color: #065f46; }
+
+/* L3 color theme */
+.l3-stage { background: #fff7ed; border-color: #fdba74; }
+.l3-stage .stage-num { background: #f97316; }
+.l3-badge { background: #ffedd5; color: #c2410c; }
+.l3-flow { background: #ffedd5; color: #c2410c; }
+
+.warn-badge { background: #fee2e2; color: #991b1b; font-size: 9px; font-weight: 700; border-radius: 4px; padding: 2px 6px; margin-left: 6px; }
+</style>
+</head>
+<body>
+<h2 class="sr-only">NHCS Layer 2 TMFT and Layer 3 CRIM deep-dive: physics solvers, hardware specs, biometric loop, and cognitive integration pipeline</h2>
+
+<div class="tabs">
+  <div class="tab tab-l2 active" onclick="switchTab('l2')">Layer 2 — TMFT Physics</div>
+  <div class="tab tab-l3" onclick="switchTab('l3')">Layer 3 — CRIM Biometrics</div>
+</div>
+
+<!-- ============ LAYER 2 ============ -->
+<div class="panel active" id="panel-l2">
+
+  <div class="stage l2-stage open" id="l2s1">
+    <div class="stage-header" onclick="toggleStage('l2s1')">
+      <div class="stage-num">1</div>
+      <div class="stage-info">
+        <div class="stage-name">TPMM — Topological-Physical Mapping Model</div>
+        <div class="stage-tag">topology_to_field.py — Betti numbers → frequency & wavelength</div>
+      </div>
+      <div class="chevron">▼</div>
+    </div>
+    <div class="stage-body">
+      <div class="formula-row">
+        <div class="formula-box">
+          <div class="formula-title">Local Complexity Index → Frequency</div>
+          <div class="formula-eq">Iᶠ = β₁ + 2β₂</div>
+          <div class="formula-eq">f(Iᶠ) = 1 + (59·Iᶠ) / (5 + Iᶠ)</div>
+          <div class="formula-ex">S¹ (circle): β₁=1 → Iᶠ=1 → <strong>10.83 Hz</strong><br>T² (torus): β₁=2,β₂=1 → Iᶠ=4 → <strong>27.22 Hz</strong></div>
+        </div>
+        <div class="formula-box">
+          <div class="formula-title">Global Structural Index → Wavelength</div>
+          <div class="formula-eq">Iₗ = (β₀ - 1) + D</div>
+          <div class="formula-eq">λ(Iₗ) = 420 + (300·Iₗ) / (5 + Iₗ)</div>
+          <div class="formula-ex">S¹: β₀=1, D=1 → Iₗ=1 → <strong>470.0 nm</strong> (blue)<br>T²: β₀=1, D=2 → Iₗ=2 → <strong>505.7 nm</strong> (cyan)</div>
+        </div>
+      </div>
+      <div class="regime-bar">
+        <div class="regime-title">Resonant Stability Regime (hard clamp in RetargetRequest validator)</div>
+        <div class="bar-track">
+          <div class="bar-zone zone-danger-l">Viscous diffusion<br>&lt;15 Hz</div>
+          <div class="bar-zone zone-safe">✓ STABLE<br>15–40 Hz</div>
+          <div class="bar-zone zone-danger-r">Turbulent<br>destruction &gt;40 Hz</div>
+        </div>
+        <div class="bar-labels"><span>1 Hz</span><span>15 Hz</span><span>40 Hz</span><span>60 Hz</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow"><div class="flow-line"></div><div class="flow-pill l2-flow">target Hopf map (N×4 S³ grid) + freq + wavelength</div><div class="flow-line"></div></div>
+
+  <div class="stage l2-stage" id="l2s2">
+    <div class="stage-header" onclick="toggleStage('l2s2')">
+      <div class="stage-num">2</div>
+      <div class="stage-info">
+        <div class="stage-name">Four Coupled Solvers — Digital Twin</div>
+        <div class="stage-tag">twin.py orchestrates llg_solver · q_tensor · fluid · photonics · coil_field</div>
+      </div>
+      <div class="chevron">▼</div>
+    </div>
+    <div class="stage-body">
+      <div class="solver-row">
+        <div class="solver">
+          <div class="solver-name">① Coil Field (EM Solver)</div>
+          <div class="solver-lib">coil_field.py · Biot-Savart + FEM</div>
+          <div class="solver-desc">12-channel dodecahedral array: nested tri-axial Helmholtz + Maxwell pairs + RF micro-coils. Computes spatial B-field as function of 12 channel currents. Hard limit: B &lt; 45 mT (above → Rosensweig instability). Target: ~28 mT stable.</div>
+        </div>
+        <div class="solver">
+          <div class="solver-name">② LLG Solver (Magnetization)</div>
+          <div class="solver-lib">llg_solver.py · MuMax3 wrapper</div>
+          <div class="solver-desc">Landau–Lifshitz–Gilbert dynamics for Fe₃O₄ ferromagnetic nematic colloid. Couples magnetization M with coil B-field. Drives formation of Hopfion spin texture. JAX reduced-order (64³ grid) used before full MuMax3 run.</div>
+        </div>
+        <div class="solver">
+          <div class="solver-name">③ Q-Tensor Solver (Liquid Crystal)</div>
+          <div class="solver-lib">q_tensor.py · FEniCSx</div>
+          <div class="solver-desc">Nematic Landau–de Gennes Q-tensor PDE. Models liquid-crystal director field coupled with magnetization. Handles topology changes (sphere→torus→double-torus) via defect-mediated transitions. Trickiest solver — genus-shifting is an order-parameter topology change.</div>
+        </div>
+        <div class="solver">
+          <div class="solver-name">④ Fluid + Photonic Solvers</div>
+          <div class="solver-lib">fluid.py · photonics.py</div>
+          <div class="solver-desc">Navier–Stokes (incompressible + active director stress) verifies Hopfion stability within viscosity window. FDTD / transfer-matrix maps Valence → emission wavelength 420–720 nm. Ensures no turbulence during reconfigure (&lt;2s budget).</div>
+        </div>
+      </div>
+      <div style="margin-top:8px; font-size:10px; color:#374151; background:rgba(255,255,255,0.6); border-radius:6px; padding:7px 9px;">
+        <strong>Differentiable path:</strong> Replace solvers with JAX-MD / JAX-CFD / Warp for end-to-end adjoint gradients → free adjoint-based control synthesis (target Hopfion → optimal coil currents). Buys you <em>controller inversion</em> without a separate optimizer.
+      </div>
+    </div>
+  </div>
+
+  <div class="flow"><div class="flow-line"></div><div class="flow-pill l2-flow">achieved Hopf charge, charge_error_pct, mesh + field tensors</div><div class="flow-line"></div></div>
+
+  <div class="stage l2-stage" id="l2s3">
+    <div class="stage-header" onclick="toggleStage('l2s3')">
+      <div class="stage-num">3</div>
+      <div class="stage-info">
+        <div class="stage-name">Controller — Invert Target → Coil Currents</div>
+        <div class="stage-tag">controller.py · chamber.py — adjoint optimization, lateral RetargetRequest handler</div>
+      </div>
+      <div class="chevron">▼</div>
+    </div>
+    <div class="stage-body">
+      <div class="subcomps">
+        <div class="sub" onclick="toggleSub(this)">
+          <div class="sub-header">
+            <div class="sub-name">Forward inversion: target Hopfion → 12 coil currents</div>
+            <div class="badge l2-badge">Adjoint</div>
+          </div>
+          <div class="sub-detail">Given a target Hopf map from TPMM, the controller solves the inverse problem: what combination of 12 coil currents produces the target B-field configuration? Solved via adjoint methods or differentiable physics. The 6-axis Helmholtz array supports 50 kHz frequency modulation, 150 A/ms slew rate, sub-50ns signal latency via FPGA + Direct Digital Synthesis (DDS).</div>
+        </div>
+        <div class="sub" onclick="toggleSub(this)">
+          <div class="sub-header">
+            <div class="sub-name">Sapphire Chamber Boundary Conditions</div>
+            <div class="badge l2-badge">chamber.py</div>
+          </div>
+          <div class="sub-detail">100mm monocrystalline sapphire (Al₂O₃) sphere, 5mm wall. >98.5% transmission 420–720nm. Zero-velocity boundary condition provides inward radial pressure preventing vortex rings from expanding. Grade-5 Titanium cage withstands 250N oscillating magnetic load. Micro-channel water cooling prevents eddy-current thermal drift.</div>
+        </div>
+        <div class="sub" onclick="toggleSub(this)">
+          <div class="sub-header">
+            <div class="sub-name">RetargetRequest handler (lateral from L3)</div>
+            <div class="badge l2-badge">Lateral</div>
+          </div>
+          <div class="sub-detail">Layer 3 PID may request frequency adjustments if CLI overshoots. The controller intercepts these <code>RetargetRequest</code> messages and adjusts coil currents accordingly — BUT only within 15–40 Hz (Pydantic validator hard-clamps at field level). L3 cannot trigger turbulent destruction or viscous diffusion regardless of how extreme a CLI spike is.</div>
+        </div>
+      </div>
+      <div class="risk">
+        <div class="risk-title">⚠ Known tensions from research brief</div>
+        The executive brief flagged the L2/L3 contradiction: if L3 Delivery Throttler drops frequency below 15 Hz to calm a stressed user, the Hopfion suffers viscous diffusion. The resolution is the hard Pydantic clamp on <code>RetargetRequest.requested_frequency_hz</code> — L3 can <em>ask</em> but the physics boundary is enforced in schemas.py.
+      </div>
+    </div>
+  </div>
+
+  <div class="output-box output-l2">
+    <div class="output-title">→ PhysicalRealization (bus: physical_realization → Layer 3)</div>
+    <div class="output-fields">
+      <div class="field-l2">achieved_hopf_charge</div>
+      <div class="field-l2">charge_error_pct</div>
+      <div class="field-l2">target_frequency_hz</div>
+      <div class="field-l2">target_wavelength_nm</div>
+      <div class="field-l2">EmissionSpectrum (60Hz trajectory)</div>
+      <div class="field-l2">mesh_vertices (N×3)</div>
+      <div class="field-l2">mesh_field_tensors (N×9)</div>
+      <div class="field-l2">mean_b_field_mt</div>
+    </div>
+    <div style="margin-top:7px; font-size:10px; color:#065f46; font-style:italic;">Physics boundary — Layer 3 cannot reach back into solvers. Swap real hardware in without touching CRIM.</div>
+  </div>
+
+</div>
+
+<!-- ============ LAYER 3 ============ -->
+<div class="panel" id="panel-l3">
+
+  <div class="stage l3-stage open" id="l3s1">
+    <div class="stage-header" onclick="toggleStage('l3s1')">
+      <div class="stage-num">1</div>
+      <div class="stage-info">
+        <div class="stage-name">Semantic Translation — Hopfion → 65 NSM Primes</div>
+        <div class="stage-tag">prime_map.py · phen_space.py — physical vectors to "atoms of human thought"</div>
+      </div>
+      <div class="chevron">▼</div>
+    </div>
+    <div class="stage-body">
+      <div class="prime-grid">
+        <div class="prime-cat">
+          <div class="prime-cat-name">Spatial</div>
+          <div class="prime-cat-item">+Z → ABOVE<br>radial prox → NEAR/FAR<br>3D coords → HERE/THERE</div>
+        </div>
+        <div class="prime-cat">
+          <div class="prime-cat-name">Temporal</div>
+          <div class="prime-cat-item">linear idx → MOMENT<br>intervals → BEFORE/AFTER<br>current frame → NOW</div>
+        </div>
+        <div class="prime-cat">
+          <div class="prime-cat-name">Magnitude</div>
+          <div class="prime-cat-item">scalar moduli → BIG/SMALL<br>intensity → VERY/MORE<br>zero → NOT</div>
+        </div>
+      </div>
+      <div style="margin-top:8px; font-size:10px; color:#374151; background:rgba(255,255,255,0.6); border-radius:6px; padding:7px 9px;">
+        <strong>Semantic Molecules:</strong> Combinations of primes describe complex phenomena (rotation, force) without calculus. The Multi-Dimensional Phenomenological Vector Space (phen_space.py) holds the full learned projection. <strong>Design tension:</strong> L1 strips all human priors — L3 rebuilds them via NSM. The risk is making "alien" topologies so familiar they lose transformative power.
+      </div>
+    </div>
+  </div>
+
+  <div class="flow"><div class="flow-line"></div><div class="flow-pill l3-flow">NSM prime vectors + phenomenological coords</div><div class="flow-line"></div></div>
+
+  <div class="stage l3-stage" id="l3s2">
+    <div class="stage-header" onclick="toggleStage('l3s2')">
+      <div class="stage-num">2</div>
+      <div class="stage-info">
+        <div class="stage-name">Biometric Sensing — Lab Streaming Layer</div>
+        <div class="stage-tag">biometrics_lsl.py · synthetic_subject.py — real or simulated sub-100ms streams</div>
+      </div>
+      <div class="chevron">▼</div>
+    </div>
+    <div class="stage-body">
+      <div class="bio-row">
+        <div class="bio-card">
+          <div class="bio-icon">👁️</div>
+          <div class="bio-name">Pupillometry</div>
+          <div class="bio-sim">Sim: pupillary light + cognition model. Real: Tobii/Pupil Labs SDK.</div>
+        </div>
+        <div class="bio-card">
+          <div class="bio-icon">❤️</div>
+          <div class="bio-name">HRV</div>
+          <div class="bio-sim">Sim: McSharry ECG model. Real: chest strap or PPG sensor via LSL.</div>
+        </div>
+        <div class="bio-card">
+          <div class="bio-icon">⚡</div>
+          <div class="bio-name">GSR</div>
+          <div class="bio-sim">Sim: Bach leaky-integrator model. Real: galvanic skin response electrode.</div>
+        </div>
+      </div>
+      <div class="risk">
+        <div class="risk-title">⚠ Critical gap flagged in research (Worker-Huma-2)</div>
+        No standardized biometric baselines exist for CLI calculation. Pupillometry + HRV telemetry mapping lacks baseline calibration. Airlock logic is theoretically sound but non-operational until a human cohort is used to calibrate thresholds — identified as top priority in executive brief.
+      </div>
+    </div>
+  </div>
+
+  <div class="flow"><div class="flow-line"></div><div class="flow-pill l3-flow">pupil dilation, HRV intervals, GSR conductance @ &lt;100ms</div><div class="flow-line"></div></div>
+
+  <div class="stage l3-stage" id="l3s3">
+    <div class="stage-header" onclick="toggleStage('l3s3')">
+      <div class="stage-num">3</div>
+      <div class="stage-info">
+        <div class="stage-name">CLI Estimator + PID Controller (Airlock)</div>
+        <div class="stage-tag">cli.py · pid.py · airlock.py — target CLI = 0.6 (Flow State)</div>
+      </div>
+      <div class="chevron">▼</div>
+    </div>
+    <div class="stage-body">
+      <div class="pid-box">
+        <div class="pid-title">Closed-loop control flow</div>
+        <div class="pid-flow">
+          <div class="pid-step">Biometrics</div><div class="pid-arrow">→</div>
+          <div class="pid-step">CLI estimator<br><span style="font-size:9px;font-weight:400">fuse 3 streams → scalar ∈[0,1]</span></div><div class="pid-arrow">→</div>
+          <div class="pid-step">PID<br><span style="font-size:9px;font-weight:400">error = CLI − 0.6</span></div><div class="pid-arrow">→</div>
+          <div class="pid-step">IIS<br><span style="font-size:9px;font-weight:400">Immersion Intensity Score</span></div>
+        </div>
+        <div style="margin-top:8px; font-size:10px; color:#374151;">
+          <strong>High CLI (overload):</strong> Airlock lowers abstraction, triggers Semantic Scaffolder (concrete analogies), slows Delivery Throttler.<br>
+          <strong>Low CLI (underload):</strong> Airlock synthesizes concepts into higher-order models, increases pacing.<br>
+          <strong>RetargetRequest:</strong> If frequency adjustment needed, PID emits <code>RetargetRequest</code> to Layer 2 (clamped 15–40 Hz).
+        </div>
+      </div>
+      <div class="subcomps" style="margin-top:8px;">
+        <div class="sub" onclick="toggleSub(this)">
+          <div class="sub-header">
+            <div class="sub-name">Ego-syntonic Gamification</div>
+            <div class="badge l3-badge">render.py</div>
+          </div>
+          <div class="sub-detail">
+            <strong>IKEA Effect:</strong> Outputs are framed as the user's personal discoveries — not external data. Variable reward schedules and co-creation gestures reinforce ownership.<br><br>
+            <strong>False Friction:</strong> Non-consequential "confirm" swipes satisfy the user's need for agency while the algorithm maintains its optimal path.<br><br>
+            <strong>Shadow UI:</strong> Morphs based on biometric state. "Wait-time simulations" (shimmer animations) increase perceived value of results.<br><br>
+            Goal: bypass the psychological immune system — user integrates alien topologies as felt insights rather than received data.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow"><div class="flow-line"></div><div class="flow-pill l3-flow">CLI series, IIS series, BHI, SDR + confidence</div><div class="flow-line"></div></div>
+
+  <div class="stage l3-stage" id="l3s4">
+    <div class="stage-header" onclick="toggleStage('l3s4')">
+      <div class="stage-num">4</div>
+      <div class="stage-info">
+        <div class="stage-name">Metrics — BHI & SDR Scoring</div>
+        <div class="stage-tag">metrics.py — closes outer loop back to Layer 1 merit priors</div>
+      </div>
+      <div class="chevron">▼</div>
+    </div>
+    <div class="stage-body">
+      <div class="subcomps">
+        <div class="sub" onclick="toggleSub(this)">
+          <div class="sub-header">
+            <div class="sub-name">BHI — Biometric Homeostasis Index ∈ [0,1]</div>
+            <div class="badge l3-badge">Stability</div>
+          </div>
+          <div class="sub-detail">Measures how well the subject maintained physiological equilibrium during the concept delivery. High BHI = user stayed in flow state throughout. Low BHI = significant autonomic disruption (spikes in GSR, HRV crash). Feeds back to L1 as evidence that this topology class is biologically tolerable.</div>
+        </div>
+        <div class="sub" onclick="toggleSub(this)">
+          <div class="sub-header">
+            <div class="sub-name">SDR — Semantic Distance Reduction ∈ [0,1]</div>
+            <div class="badge l3-badge">Integration</div>
+          </div>
+          <div class="sub-detail">Measures how much the conceptual distance between the delivered topology and the user's existing semantic model was reduced by the session. High SDR = successful integration (the "alien" became familiar). The key empirical unknown: does high SDR mean genuine conceptual uptake, or just well-tuned synesthetic VR? Cannot be resolved computationally — requires real participants.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="output-box output-l3">
+    <div class="output-title">→ IntegrationFeedback (bus: integration_feedback → Layer 1)</div>
+    <div class="output-fields">
+      <div class="field-l3">concept_id</div>
+      <div class="field-l3">cli_series[]</div>
+      <div class="field-l3">iis_series[]</div>
+      <div class="field-l3">bhi ∈ [0,1]</div>
+      <div class="field-l3">sdr ∈ [0,1]</div>
+      <div class="field-l3">sdr_confidence</div>
+      <div class="field-l3">synthetic_subject: bool</div>
+      <div class="field-l3">n_integration_steps</div>
+    </div>
+    <div style="margin-top:7px; font-size:10px; color:#9a3412; font-style:italic;">Updates Layer 1 merit priors — topologies that produced high BHI + SDR get upweighted in future RSE synthesis.</div>
+  </div>
+
+</div>
+
+<script>
+function switchTab(layer) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelector('.tab-' + layer).classList.add('active');
+  document.getElementById('panel-' + layer).classList.add('active');
+}
+function toggleStage(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+function toggleSub(el) {
+  event.stopPropagation();
+  const wasOpen = el.classList.contains('open');
+  el.closest('.subcomps').querySelectorAll('.sub.open').forEach(s => s.classList.remove('open'));
+  if (!wasOpen) el.classList.add('open');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+run:
+  seed: 42
+  log_level: INFO
+  mode: simulation          # simulation | hardware
+
+bus:
+  backend: inprocess        # inprocess | zmq
+  zmq_address: "tcp://127.0.0.1:5555"
+
+layer1:
+  rse:
+    n_seed_complexes: 20    # per run() call; 200 is too slow for demo — use 20 for dev
+    max_iterations: 500
+    complexity_threshold: 0.3
+    persistence_threshold: 0.1
+  aian:
+    novelty_threshold: 0.6   # below this → reject as too human-like
+    encoder_model: "all-MiniLM-L6-v2"
+  icvp:
+    n_validators: 5
+    supermajority: 0.667
+    et_threshold: 0.50       # read by ValidatorNode
+    ap_threshold: 0.00       # read by ValidatorNode
+
+layer2:
+  twin:
+    # NOTE: grid_size is read directly by DigitalTwin via this file.
+    # 16 = good balance of accuracy vs speed with vectorised solver.
+    # 64 = high fidelity (slower, use for final validation runs).
+    grid_size: 16
+    target_tolerance: 0.10   # max allowed Hopf charge error
+  resonant_stability_hz: [15.0, 40.0]
+  max_field_mt: 45.0         # = rosensweig_threshold_mt in colloid_fe3o4.yaml
+
+layer3:
+  crim:
+    cli_setpoint: 0.6
+    n_crim_steps: 50         # biometric integration steps per concept
+    synthetic_subject: true
+    renderer: open3d_headless
+  feedback_hz: 10            # rate at which CRIM sends IntegrationFeedback

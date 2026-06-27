@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRIM — Cognitive Receptivity & Integration Model</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=Space+Grotesk:wght@400;500;700&display=swap');
+
+:root {
+  --bg:       #020609;
+  --bg2:      #050d14;
+  --bg3:      #081018;
+  --amber:    #f5a623;
+  --amber-d:  rgba(245,166,35,0.18);
+  --amber-dd: rgba(245,166,35,0.07);
+  --green:    #34d399;
+  --red:      #f87171;
+  --blue:     #60a5fa;
+  --cyan:     #22d3ee;
+  --purple:   #a78bfa;
+  --text:     #c8dde8;
+  --dim:      rgba(200,221,232,0.38);
+  --border:   rgba(245,166,35,0.13);
+  --border-b: rgba(245,166,35,0.4);
+  --mono:     'IBM Plex Mono', monospace;
+  --sans:     'Space Grotesk', sans-serif;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--mono);font-size:11px;}
+
+/* noise */
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.028'/%3E%3C/svg%3E");}
+/* scanlines */
+body::after{content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.011) 2px,rgba(0,0,0,0.011) 4px);}
+
+/* ── layout ── */
+#app{display:grid;grid-template-rows:38px 1fr 1fr;grid-template-columns:260px 1fr 1fr 260px;height:100vh;position:relative;z-index:1;}
+
+/* ── header ── */
+#hdr{grid-column:1/-1;grid-row:1;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px;border-bottom:1px solid var(--border);
+  background:rgba(0,4,8,0.97);}
+#hdr h1{font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2.5px;
+  color:var(--amber);text-shadow:0 0 16px rgba(245,166,35,0.45);}
+.hdr-pills{display:flex;gap:14px;align-items:center;}
+.pill{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);}
+.pill b{color:var(--amber);}
+.pill.live b{color:var(--green);animation:blink-g 1.5s ease infinite;}
+@keyframes blink-g{0%,100%{opacity:1;}50%{opacity:0.3;}}
+
+/* ── panel base ── */
+.panel{background:rgba(4,10,18,0.9);border:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;}
+.ph{display:flex;align-items:center;justify-content:space-between;
+  padding:5px 11px;border-bottom:1px solid var(--border);
+  background:rgba(245,166,35,0.03);
+  font-family:var(--sans);font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--amber);}
+.ph span{font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:0;font-weight:400;}
+
+/* ── grid placement ── */
+#col-l{grid-column:1;grid-row:2/4;}
+#bio-pupil{grid-column:2;grid-row:2;}
+#bio-hrv  {grid-column:2;grid-row:3;}
+#cli-panel{grid-column:3;grid-row:2;}
+#kpi-panel{grid-column:3;grid-row:3;}
+#col-r{grid-column:4;grid-row:2/4;}
+
+/* ── left col: UMD schema + primes ── */
+.schema-table{padding:8px 10px;border-bottom:1px solid var(--border);}
+.tbl-name{font-family:var(--sans);font-size:9px;font-weight:700;color:var(--amber);margin-bottom:5px;letter-spacing:1px;}
+.field-row{display:grid;grid-template-columns:1fr auto auto;gap:0 8px;padding:2px 0;border-bottom:1px solid rgba(245,166,35,0.04);font-size:8px;}
+.fn{color:var(--text);}
+.ft{color:var(--blue);font-size:7.5px;}
+.fk{font-size:7px;padding:1px 4px;border-radius:2px;background:rgba(245,166,35,0.12);color:var(--amber);}
+
+.primes-section{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+.primes-grid{flex:1;overflow:hidden;display:grid;grid-template-columns:repeat(5,1fr);gap:2px;padding:6px 8px;align-content:start;}
+.prime{
+  padding:3px 2px;border:1px solid rgba(245,166,35,0.08);border-radius:2px;
+  text-align:center;font-size:8px;letter-spacing:0.5px;color:var(--dim);
+  transition:all 0.4s ease;cursor:default;background:transparent;
+}
+.prime.hot{color:#fff;background:rgba(245,166,35,0.18);border-color:var(--amber);text-shadow:0 0 6px rgba(245,166,35,0.7);}
+.prime.warm{color:var(--amber);background:rgba(245,166,35,0.07);border-color:rgba(245,166,35,0.25);}
+.prime.cool{color:var(--blue);background:rgba(96,165,250,0.06);border-color:rgba(96,165,250,0.18);}
+
+/* ── waveform panels ── */
+.wave-wrap{flex:1;position:relative;overflow:hidden;}
+.wave-canvas{display:block;width:100%;height:100%;}
+.wave-overlay{position:absolute;top:6px;right:10px;font-size:9px;text-align:right;pointer-events:none;}
+.wave-val{font-size:14px;font-family:var(--sans);font-weight:700;color:var(--green);}
+.wave-val.warn{color:var(--amber);}
+.wave-val.alert{color:var(--red);animation:blink-g 0.6s ease infinite;}
+.wave-unit{font-size:8px;color:var(--dim);margin-top:1px;}
+.ch-labels{display:flex;gap:12px;padding:4px 10px;border-top:1px solid var(--border);font-size:8px;color:var(--dim);}
+.ch-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px;}
+
+/* ── CLI gauge ── */
+#cli-panel{position:relative;}
+.cli-body{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:0;overflow:hidden;}
+.cli-gauge-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px;border-right:1px solid var(--border);}
+.gauge-svg{overflow:visible;}
+.cli-formula{padding:10px;display:flex;flex-direction:column;justify-content:space-between;}
+.formula-block{background:rgba(245,166,35,0.04);border:1px solid var(--border);padding:8px;border-radius:3px;margin-bottom:6px;}
+.formula-title{font-size:8px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+.formula-math{font-size:10px;color:var(--text);line-height:1.7;}
+.formula-math b{color:var(--amber);}
+.formula-math i{color:var(--blue);}
+.cli-inputs{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.cli-inp{background:rgba(0,0,0,0.3);border:1px solid var(--border);padding:5px 7px;border-radius:2px;}
+.ci-key{font-size:8px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px;}
+.ci-val{font-size:13px;font-family:var(--sans);font-weight:700;color:var(--cyan);}
+
+/* ── KPI panel ── */
+.kpi-grid{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;overflow:hidden;}
+.kpi-card{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:8px 10px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;}
+.kpi-card:nth-child(2n){border-right:none;}
+.kpi-card:nth-child(3),.kpi-card:nth-child(4){border-bottom:none;}
+.kpi-name{font-family:var(--sans);font-size:8px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);margin-bottom:2px;}
+.kpi-abbr{font-family:var(--sans);font-size:22px;font-weight:700;line-height:1;}
+.kpi-val{font-family:var(--mono);font-size:11px;color:var(--text);margin-top:4px;}
+.kpi-formula{font-size:8px;color:var(--dim);margin-top:3px;line-height:1.5;}
+.kpi-bar-wrap{height:3px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:5px;overflow:hidden;}
+.kpi-bar{height:100%;border-radius:2px;transition:width 0.5s ease;}
+.sparkline-wrap{height:28px;margin-top:4px;}
+.mini-spark{display:block;width:100%;height:100%;}
+
+/* ── right col: API + endpoint monitor ── */
+.api-endpoint{padding:8px 10px;border-bottom:1px solid var(--border);}
+.ep-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;}
+.ep-method{font-size:8px;padding:1px 5px;background:rgba(52,211,153,0.15);border:1px solid rgba(52,211,153,0.3);color:var(--green);border-radius:2px;}
+.ep-path{font-size:9px;color:var(--text);}
+.ep-badge{margin-left:auto;font-size:8px;padding:1px 5px;border-radius:2px;}
+.badge-edge{background:rgba(167,139,250,0.14);border:1px solid rgba(167,139,250,0.3);color:var(--purple);}
+.ep-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;font-size:8px;color:var(--dim);}
+.ep-stat b{color:var(--text);}
+.ep-zod{margin-top:4px;font-size:8px;background:rgba(0,0,0,0.3);padding:4px 6px;border-radius:2px;color:var(--dim);border-left:2px solid rgba(96,165,250,0.4);line-height:1.6;}
+.ep-zod .prop{color:var(--blue);}
+.ep-zod .type{color:var(--green);}
+
+.req-log{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+.req-stream{flex:1;overflow-y:auto;padding:4px 0;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.req-item{padding:4px 10px;border-bottom:1px solid rgba(245,166,35,0.04);font-size:8px;animation:fIn 0.3s ease;display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;}
+@keyframes fIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
+.req-ts{color:var(--dim);white-space:nowrap;}
+.req-body{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.req-status{padding:1px 4px;border-radius:2px;font-size:7px;}
+.s200{background:rgba(52,211,153,0.15);color:var(--green);}
+.s422{background:rgba(248,113,113,0.15);color:var(--red);}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="hdr">
+    <h1>CRIM — COGNITIVE RECEPTIVITY &amp; INTEGRATION MODEL</h1>
+    <div class="hdr-pills">
+      <div class="pill live">VR SESSION <b>● LIVE</b></div>
+      <div class="pill">SUBJECT <b id="subj-id">SBJ-00A4</b></div>
+      <div class="pill">RUNTIME <b id="runtime">00:00:00</b></div>
+      <div class="pill">INGEST RATE <b id="ingest-hz">60 Hz</b></div>
+      <div class="pill">PGVECTOR <b>1536-DIM</b></div>
+    </div>
+  </header>
+
+  <!-- LEFT: Schema + UMD Primes -->
+  <div class="panel" id="col-l">
+    <div class="ph">UMD — Universal Mapping Dictionary <span>NSM 65-PRIME</span></div>
+
+    <div class="schema-table">
+      <div class="tbl-name">semantic_primes</div>
+      <div class="field-row"><span class="fn">id</span><span class="ft">BIGSERIAL</span><span class="fk">PK</span></div>
+      <div class="field-row"><span class="fn">prime_text</span><span class="ft">TEXT</span><span class="fk">UNIQUE</span></div>
+      <div class="field-row"><span class="fn">vector</span><span class="ft">vector(1536)</span><span class="fk">INDEX</span></div>
+      <div class="field-row"><span class="fn">category</span><span class="ft">TEXT</span><span></span></div>
+    </div>
+
+    <div class="schema-table">
+      <div class="tbl-name">biometric_logs</div>
+      <div class="field-row"><span class="fn">id</span><span class="ft">BIGSERIAL</span><span class="fk">PK</span></div>
+      <div class="field-row"><span class="fn">session_id</span><span class="ft">UUID</span><span class="fk">FK</span></div>
+      <div class="field-row"><span class="fn">ts</span><span class="ft">TIMESTAMPTZ</span><span></span></div>
+      <div class="field-row"><span class="fn">pupil_l / pupil_r</span><span class="ft">FLOAT8</span><span></span></div>
+      <div class="field-row"><span class="fn">rr_interval</span><span class="ft">FLOAT8</span><span></span></div>
+    </div>
+
+    <div class="schema-table" style="border-bottom:1px solid var(--border);margin-bottom:0">
+      <div class="tbl-name">session_metrics</div>
+      <div class="field-row"><span class="fn">cli_history</span><span class="ft">JSONB</span><span></span></div>
+      <div class="field-row"><span class="fn">kpi_snapshot</span><span class="ft">JSONB</span><span></span></div>
+      <div class="field-row"><span class="fn">active_primes</span><span class="ft">INT[]</span><span class="fk">→UMD</span></div>
+    </div>
+
+    <div class="ph" style="margin-top:0;">Activated Semantic Primes <span id="hot-count">0 active</span></div>
+    <div class="primes-section">
+      <div class="primes-grid" id="primes-grid"></div>
+    </div>
+  </div>
+
+  <!-- Pupil waveform -->
+  <div class="panel" id="bio-pupil">
+    <div class="ph">Pupillometry — TEPR <span>LEFT + RIGHT CHANNEL</span></div>
+    <div class="wave-wrap">
+      <canvas class="wave-canvas" id="cv-pupil"></canvas>
+      <div class="wave-overlay">
+        <div class="wave-val" id="pupil-val">4.2mm</div>
+        <div class="wave-unit">mean diameter</div>
+        <div style="margin-top:4px;font-size:8px;color:var(--dim)">TEPR</div>
+        <div style="font-size:12px;font-family:var(--sans);font-weight:700;" id="tepr-val">+0.00</div>
+      </div>
+    </div>
+    <div class="ch-labels">
+      <span><span class="ch-dot" style="background:#34d399"></span>LEFT  <b id="pl-val" style="color:var(--text)">—</b></span>
+      <span><span class="ch-dot" style="background:#60a5fa"></span>RIGHT <b id="pr-val" style="color:var(--text)">—</b></span>
+      <span style="margin-left:auto;color:var(--dim)">CONF <b id="conf-val" style="color:var(--text)">—</b></span>
+    </div>
+  </div>
+
+  <!-- HRV waveform -->
+  <div class="panel" id="bio-hrv">
+    <div class="ph">Heart Rate Variability — RMSSD <span>RR-INTERVAL STREAM</span></div>
+    <div class="wave-wrap">
+      <canvas class="wave-canvas" id="cv-hrv"></canvas>
+      <div class="wave-overlay">
+        <div class="wave-val" id="hr-val">72</div>
+        <div class="wave-unit">bpm</div>
+        <div style="margin-top:4px;font-size:8px;color:var(--dim)">RMSSD</div>
+        <div style="font-size:12px;font-family:var(--sans);font-weight:700;color:var(--cyan);" id="rmssd-val">42ms</div>
+      </div>
+    </div>
+    <div class="ch-labels">
+      <span><span class="ch-dot" style="background:#f87171"></span>RR INTERVAL</span>
+      <span style="margin-left:8px;color:var(--dim)">LAST: <b id="rr-val" style="color:var(--text)">—</b></span>
+      <span style="margin-left:auto;color:var(--dim)">HRVS <b id="hrvs-val" style="color:var(--text)">—</b></span>
+    </div>
+  </div>
+
+  <!-- CLI Panel -->
+  <div class="panel" id="cli-panel">
+    <div class="ph">Cognitive Load Index — CLI <span>SIGMOID FUSION</span></div>
+    <div class="cli-body">
+      <div class="cli-gauge-wrap">
+        <svg class="gauge-svg" width="130" height="130" viewBox="0 0 130 130" id="gauge-svg">
+          <defs>
+            <linearGradient id="gauge-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#34d399"/>
+              <stop offset="50%" stop-color="#f5a623"/>
+              <stop offset="100%" stop-color="#f87171"/>
+            </linearGradient>
+          </defs>
+          <!-- track -->
+          <path id="gauge-track" d="M15,100 A55,55 0 0,1 115,100"
+            fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10" stroke-linecap="round"/>
+          <!-- fill -->
+          <path id="gauge-fill" d="M15,100 A55,55 0 0,1 115,100"
+            fill="none" stroke="url(#gauge-grad)" stroke-width="10" stroke-linecap="round"
+            stroke-dasharray="172.79" stroke-dashoffset="172.79"/>
+          <!-- needle -->
+          <line id="gauge-needle" x1="65" y1="100" x2="65" y2="48"
+            stroke="#f5a623" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+          <circle cx="65" cy="100" r="4" fill="#f5a623" opacity="0.9"/>
+          <!-- labels -->
+          <text x="12" y="116" font-size="8" fill="rgba(200,221,232,0.4)" font-family="IBM Plex Mono">0</text>
+          <text x="113" y="116" font-size="8" fill="rgba(200,221,232,0.4)" font-family="IBM Plex Mono">1</text>
+          <text x="61" y="28" font-size="8" fill="rgba(200,221,232,0.4)" font-family="IBM Plex Mono">0.5</text>
+        </svg>
+        <div style="text-align:center;margin-top:-8px;">
+          <div style="font-family:'Space Grotesk';font-size:28px;font-weight:700;color:var(--amber);text-shadow:0 0 20px rgba(245,166,35,0.5);" id="cli-big">0.000</div>
+          <div style="font-size:8px;color:var(--dim);letter-spacing:1px;margin-top:2px;" id="cli-state">LOW LOAD</div>
+        </div>
+        <canvas id="cli-sparkline" width="130" height="28" style="margin-top:6px;display:block;"></canvas>
+      </div>
+      <div class="cli-formula">
+        <div class="formula-block">
+          <div class="formula-title">Formula</div>
+          <div class="formula-math">
+            CLI = <b>σ</b>(<i>0.6</i>·TEPR<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;+ <i>0.4</i>·HRVS − β)
+          </div>
+        </div>
+        <div class="cli-inputs">
+          <div class="cli-inp">
+            <div class="ci-key">TEPR</div>
+            <div class="ci-val" id="ci-tepr">0.000</div>
+          </div>
+          <div class="cli-inp">
+            <div class="ci-key">HRVS</div>
+            <div class="ci-val" id="ci-hrvs">0.000</div>
+          </div>
+          <div class="cli-inp">
+            <div class="ci-key">β bias</div>
+            <div class="ci-val" style="color:var(--dim)">0.500</div>
+          </div>
+          <div class="cli-inp">
+            <div class="ci-key">z-score</div>
+            <div class="ci-val" id="ci-z" style="color:var(--purple)">0.000</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI Panel -->
+  <div class="panel" id="kpi-panel">
+    <div class="ph">Assimilation KPIs <span>C · R · I · M</span></div>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-name">Assimilation Efficiency</div>
+          <div class="kpi-abbr" style="color:var(--green)">AE</div>
+          <div class="kpi-formula">R / (I · M)</div>
+        </div>
+        <div>
+          <div class="kpi-val" id="kv-AE">—</div>
+          <div class="kpi-bar-wrap"><div class="kpi-bar" id="kb-AE" style="background:var(--green);width:0%"></div></div>
+          <canvas class="mini-spark" id="sp-AE"></canvas>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-name">Cognitive Saturation</div>
+          <div class="kpi-abbr" style="color:var(--amber)">CS</div>
+          <div class="kpi-formula">M / C</div>
+        </div>
+        <div>
+          <div class="kpi-val" id="kv-CS">—</div>
+          <div class="kpi-bar-wrap"><div class="kpi-bar" id="kb-CS" style="background:var(--amber);width:0%"></div></div>
+          <canvas class="mini-spark" id="sp-CS"></canvas>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-name">Information Yield</div>
+          <div class="kpi-abbr" style="color:var(--cyan)">IY</div>
+          <div class="kpi-formula">(R / I) · 100</div>
+        </div>
+        <div>
+          <div class="kpi-val" id="kv-IY">—</div>
+          <div class="kpi-bar-wrap"><div class="kpi-bar" id="kb-IY" style="background:var(--cyan);width:0%"></div></div>
+          <canvas class="mini-spark" id="sp-IY"></canvas>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-name">Processing Friction</div>
+          <div class="kpi-abbr" style="color:var(--red)">PF</div>
+          <div class="kpi-formula">(I − R) / M</div>
+        </div>
+        <div>
+          <div class="kpi-val" id="kv-PF">—</div>
+          <div class="kpi-bar-wrap"><div class="kpi-bar" id="kb-PF" style="background:var(--red);width:0%"></div></div>
+          <canvas class="mini-spark" id="sp-PF"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: API Monitor -->
+  <div class="panel" id="col-r">
+    <div class="ph">Next.js Edge API <span>APP ROUTER</span></div>
+
+    <div class="api-endpoint">
+      <div class="ep-row">
+        <span class="ep-method">POST</span>
+        <span class="ep-path">/api/biometrics/<b style="color:var(--amber)">pupil</b></span>
+        <span class="ep-badge badge-edge">EDGE</span>
+      </div>
+      <div class="ep-stats">
+        <span>RPS <b id="rps-pupil">60</b></span>
+        <span>P50 <b id="p50-pupil">3ms</b></span>
+        <span>ERR <b id="err-pupil">0</b></span>
+      </div>
+      <div class="ep-zod">
+        PupilSchema<br>
+        &nbsp;<span class="prop">pupil_l</span>: <span class="type">z.number().min(1).max(9)</span><br>
+        &nbsp;<span class="prop">pupil_r</span>: <span class="type">z.number().min(1).max(9)</span><br>
+        &nbsp;<span class="prop">confidence</span>: <span class="type">z.number().min(0).max(1)</span><br>
+        &nbsp;<span class="prop">ts</span>: <span class="type">z.string().datetime()</span>
+      </div>
+    </div>
+
+    <div class="api-endpoint">
+      <div class="ep-row">
+        <span class="ep-method">POST</span>
+        <span class="ep-path">/api/biometrics/<b style="color:var(--amber)">hrv</b></span>
+        <span class="ep-badge badge-edge">EDGE</span>
+      </div>
+      <div class="ep-stats">
+        <span>RPS <b id="rps-hrv">4</b></span>
+        <span>P50 <b id="p50-hrv">2ms</b></span>
+        <span>ERR <b id="err-hrv">0</b></span>
+      </div>
+      <div class="ep-zod">
+        HRVSchema<br>
+        &nbsp;<span class="prop">rr_interval</span>: <span class="type">z.number().positive()</span><br>
+        &nbsp;<span class="prop">heart_rate</span>: <span class="type">z.number().min(30).max(250)</span><br>
+        &nbsp;<span class="prop">session_id</span>: <span class="type">z.string().uuid()</span>
+      </div>
+    </div>
+
+    <div class="ph">Live Request Stream <span id="total-req">0 reqs</span></div>
+    <div class="req-log">
+      <div class="req-stream" id="req-stream"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── NSM 65 semantic primes ──────────────────────────────────
+const PRIMES = [
+  'I','YOU','SOMEONE','SOMETHING','PEOPLE',
+  'BODY','KIND','PART','THIS','SAME',
+  'OTHER','ONE','TWO','MUCH','MANY',
+  'ALL','GOOD','BAD','BIG','SMALL',
+  'THINK','KNOW','WANT','FEEL','SEE',
+  'HEAR','SAY','WORDS','TRUE','DO',
+  'HAPPEN','MOVE','THERE','HERE','WHEN',
+  'NOW','BEFORE','AFTER','LONG','SHORT',
+  'FAR','NEAR','SIDE','INSIDE','ABOVE',
+  'BELOW','LIVE','DIE','TIME','PLACE',
+  'WORLD','NOT','MAYBE','CAN','BECAUSE',
+  'IF','LIKE','HOW','VERY','MORE',
+  'HAVE','BE','WHERE','SAME','DIFFERENT',
+];
+
+// ── populate primes grid ──────────────────────────────────
+const grid = document.getElementById('primes-grid');
+PRIMES.forEach((p, i) => {
+  const el = document.createElement('div');
+  el.className = 'prime'; el.textContent = p; el.id = 'pr-'+i;
+  grid.appendChild(el);
+});
+
+// ── simulation state ──────────────────────────────────────
+let t = 0, frameId = 0;
+let startTime = Date.now();
+let totalReqs = 0, errCount = [0, 0];
+
+// Biometric baseline
+const BASE_PUPIL = 4.2, BASE_RMSSD = 48;
+let pupilBaseline = BASE_PUPIL;
+let rmssdBaseline = BASE_RMSSD;
+
+// Ring buffers for waveform drawing
+const WAVE_LEN = 280;
+const pupilL = new Float32Array(WAVE_LEN).fill(BASE_PUPIL);
+const pupilR = new Float32Array(WAVE_LEN).fill(BASE_PUPIL);
+const rrBuf  = new Float32Array(WAVE_LEN).fill(830);
+const cliBuf = new Float32Array(200).fill(0);
+
+// Sparkline history [AE, CS, IY, PF]
+const kpiHist = { AE:[], CS:[], IY:[], PF:[] };
+
+// ── Canvas setup ──────────────────────────────────────────
+const cvPupil = document.getElementById('cv-pupil');
+const cvHRV   = document.getElementById('cv-hrv');
+const ctxP    = cvPupil.getContext('2d');
+const ctxH    = cvHRV.getContext('2d');
+const ctxCLI  = document.getElementById('cli-sparkline').getContext('2d');
+
+function resizeCvs() {
+  [cvPupil, cvHRV].forEach(cv => {
+    const wr = cv.parentElement;
+    cv.width  = wr.offsetWidth;
+    cv.height = wr.offsetHeight;
+  });
+}
+resizeCvs();
+window.addEventListener('resize', resizeCvs);
+
+// ── Noise ────────────────────────────────────────────────
+function wn(amp=1) { return (Math.random()-0.5)*2*amp; }
+function lerp(a,b,t2){ return a+(b-a)*t2; }
+function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
+function sigmoid(x){ return 1/(1+Math.exp(-x)); }
+
+// ── Slow cognitive load oscillator ───────────────────────
+// Simulates task difficulty changing over time
+let cognitiveLoad = 0.3;
+let loadTarget = 0.3;
+let loadChangeT = 0;
+
+function updateLoadTarget() {
+  loadTarget = 0.15 + Math.random() * 0.72;
+  loadChangeT = 8 + Math.random() * 15;
+}
+updateLoadTarget();
+
+// ── Main simulation tick ──────────────────────────────────
+let physAccum = 0;
+let prevNow = performance.now();
+let rmssdSmooth = 48;
+let teprSmooth = 0, hrvsSmooth = 0;
+
+function tick() {
+  const now = performance.now();
+  const dt = Math.min((now - prevNow) / 1000, 0.05);
+  prevNow = now;
+  t += dt;
+
+  // Update cognitive load
+  loadChangeT -= dt;
+  if (loadChangeT <= 0) updateLoadTarget();
+  cognitiveLoad = lerp(cognitiveLoad, loadTarget, dt * 0.25);
+
+  // ── Pupil simulation ──────────────────────────────────
+  // Pupil dilates with cognitive load + HF noise + slow drift
+  const pupilDilation = cognitiveLoad * 2.2;
+  const pNoise = wn(0.08) + 0.06 * Math.sin(t * 4.1) + 0.03 * Math.sin(t * 11.3);
+  const pL = clamp(pupilBaseline + pupilDilation + pNoise, 2.5, 8.5);
+  const pR = clamp(pL + wn(0.1), 2.5, 8.5);
+
+  // Shift buffers
+  pupilL.copyWithin(0, 1); pupilL[WAVE_LEN-1] = pL;
+  pupilR.copyWithin(0, 1); pupilR[WAVE_LEN-1] = pR;
+
+  // TEPR: normalized dilation from baseline
+  const teprRaw = ((pL+pR)/2 - pupilBaseline) / pupilBaseline;
+  teprSmooth = lerp(teprSmooth, clamp(teprRaw, -0.5, 1.5), dt * 1.8);
+
+  // ── HRV simulation ───────────────────────────────────
+  // RR interval shortens under load (HRV suppression)
+  const hrBase = 850 - cognitiveLoad * 250;
+  const rrNoise = wn(18) + 15 * Math.sin(t * 0.25); // RSA component
+  const rr = clamp(hrBase + rrNoise, 450, 1200);
+  rrBuf.copyWithin(0, 1); rrBuf[WAVE_LEN-1] = rr;
+
+  // RMSSD from last 8 RR differences
+  const recent = Array.from(rrBuf.slice(-9));
+  let sumSq = 0;
+  for (let i=1; i<recent.length; i++) sumSq += (recent[i]-recent[i-1])**2;
+  const rmssd = Math.sqrt(sumSq/(recent.length-1));
+  rmssdSmooth = lerp(rmssdSmooth, rmssd, dt * 0.8);
+
+  // HRVS: suppression — higher load → lower RMSSD → higher HRVS
+  const hrvsRaw = clamp(1 - rmssdSmooth / rmssdBaseline, -0.3, 1.2);
+  hrvsSmooth = lerp(hrvsSmooth, hrvsRaw, dt * 1.2);
+
+  // ── CLI computation ───────────────────────────────────
+  const beta = 0.5;
+  const z = 0.6 * teprSmooth + 0.4 * hrvsSmooth - beta;
+  const cli = sigmoid(z);
+  cliBuf.copyWithin(0, 1); cliBuf[199] = cli;
+
+  // ── KPI computation ───────────────────────────────────
+  // C: capacity (inverse of sustained CLI)
+  const C = clamp(1 - 0.6*cognitiveLoad, 0.15, 1.0);
+  // I: information intake rate (scales with attention, reduced by overload)
+  const I = clamp(0.7 - 0.4*(Math.max(0, cli-0.6)), 0.1, 0.95);
+  // R: retention (good at moderate load, drops at extremes)
+  const bell = Math.exp(-((cli-0.4)**2)/(2*0.18**2));
+  const R = clamp(bell * 0.82 + 0.05, 0.05, 0.92);
+  const M = clamp(cli + 0.01, 0.01, 1.0);
+
+  const AE = clamp(R / (I * M), 0, 6);
+  const CS = clamp(M / C, 0, 2);
+  const IY = clamp((R / I) * 100, 0, 100);
+  const PF = clamp((I - R) / M, -2, 4);
+
+  // ── Spark history ─────────────────────────────────────
+  if (kpiHist.AE.push(AE) > 80) kpiHist.AE.shift();
+  if (kpiHist.CS.push(CS) > 80) kpiHist.CS.shift();
+  if (kpiHist.IY.push(IY) > 80) kpiHist.IY.shift();
+  if (kpiHist.PF.push(PF) > 80) kpiHist.PF.shift();
+
+  // ── UMD prime activation ─────────────────────────────
+  // High CLI → activate arousal/urgency primes; low CLI → calm/time primes
+  const hotCount = Math.round(cli * 22 + 3);
+  PRIMES.forEach((_, i) => {
+    const el = document.getElementById('pr-'+i);
+    if (!el) return;
+    // Deterministically assign primes to load ranges
+    const hash = ((i*37+11)%65)/65;
+    if (hash < cli * 0.6) el.className = 'prime hot';
+    else if (hash < cli * 0.85) el.className = 'prime warm';
+    else if (hash < 0.35 + (1-cli)*0.3) el.className = 'prime cool';
+    else el.className = 'prime';
+  });
+  document.getElementById('hot-count').textContent = hotCount + ' active';
+
+  // ── Render ────────────────────────────────────────────
+  drawPupilWave(pL, pR);
+  drawHRVWave(rr);
+  drawCLISparkline(cli);
+  updateGauge(cli, z);
+  updateHUDs(pL, pR, rr, rmssdSmooth, teprSmooth, hrvsSmooth, z, cli,
+             {AE, CS, IY, PF, C, R, I, M});
+  drawKPISparks();
+
+  // ── Simulated request log ─────────────────────────────
+  physAccum += dt;
+  if (physAccum > 1/12) { // ~12 log entries/sec
+    physAccum = 0;
+    emitRequest();
+  }
+
+  updateRuntime();
+  frameId = requestAnimationFrame(tick);
+}
+
+// ── Draw pupil waveform ───────────────────────────────────
+function drawPupilWave(latestL, latestR) {
+  const W = cvPupil.width, H = cvPupil.height;
+  ctxP.clearRect(0, 0, W, H);
+
+  // grid
+  ctxP.strokeStyle='rgba(245,166,35,0.05)'; ctxP.lineWidth=0.5;
+  for (let i=1; i<4; i++) {
+    ctxP.beginPath(); ctxP.moveTo(0, H*i/4); ctxP.lineTo(W, H*i/4); ctxP.stroke();
+  }
+  for (let i=0; i<8; i++) {
+    ctxP.beginPath(); ctxP.moveTo(W*i/8,0); ctxP.lineTo(W*i/8,H); ctxP.stroke();
+  }
+
+  const minP=2.0, maxP=9.0, range=maxP-minP;
+  function scaleY(v) { return H - (v - minP)/range * H * 0.88 - H*0.06; }
+
+  // LEFT eye
+  ctxP.beginPath(); ctxP.strokeStyle='rgba(52,211,153,0.85)'; ctxP.lineWidth=1.4;
+  for (let i=0; i<WAVE_LEN; i++) {
+    const x=i/WAVE_LEN*W, y=scaleY(pupilL[i]);
+    i===0?ctxP.moveTo(x,y):ctxP.lineTo(x,y);
+  }
+  ctxP.stroke();
+
+  // RIGHT eye
+  ctxP.beginPath(); ctxP.strokeStyle='rgba(96,165,250,0.75)'; ctxP.lineWidth=1.2;
+  for (let i=0; i<WAVE_LEN; i++) {
+    const x=i/WAVE_LEN*W, y=scaleY(pupilR[i]);
+    i===0?ctxP.moveTo(x,y):ctxP.lineTo(x,y);
+  }
+  ctxP.stroke();
+
+  // Baseline marker
+  ctxP.strokeStyle='rgba(245,166,35,0.25)'; ctxP.lineWidth=0.8;
+  ctxP.setLineDash([4,6]);
+  ctxP.beginPath(); ctxP.moveTo(0,scaleY(BASE_PUPIL)); ctxP.lineTo(W,scaleY(BASE_PUPIL));
+  ctxP.stroke(); ctxP.setLineDash([]);
+}
+
+// ── Draw HRV waveform ─────────────────────────────────────
+function drawHRVWave(latestRR) {
+  const W = cvHRV.width, H = cvHRV.height;
+  ctxH.clearRect(0, 0, W, H);
+
+  ctxH.strokeStyle='rgba(245,166,35,0.05)'; ctxH.lineWidth=0.5;
+  for (let i=1; i<4; i++) {
+    ctxH.beginPath(); ctxH.moveTo(0,H*i/4); ctxH.lineTo(W,H*i/4); ctxH.stroke();
+  }
+
+  const minR=400, maxR=1200, range=maxR-minR;
+  function scaleY(v){ return H - (v-minR)/range * H*0.88 - H*0.06; }
+
+  // gradient fill
+  const grd = ctxH.createLinearGradient(0,0,0,H);
+  grd.addColorStop(0, 'rgba(248,113,113,0.22)');
+  grd.addColorStop(1, 'rgba(248,113,113,0)');
+  ctxH.beginPath();
+  for (let i=0; i<WAVE_LEN; i++) {
+    const x=i/WAVE_LEN*W, y=scaleY(rrBuf[i]);
+    i===0?ctxH.moveTo(x,y):ctxH.lineTo(x,y);
+  }
+  ctxH.lineTo(W,H); ctxH.lineTo(0,H); ctxH.closePath();
+  ctxH.fillStyle=grd; ctxH.fill();
+
+  ctxH.beginPath(); ctxH.strokeStyle='rgba(248,113,113,0.9)'; ctxH.lineWidth=1.5;
+  for (let i=0; i<WAVE_LEN; i++) {
+    const x=i/WAVE_LEN*W, y=scaleY(rrBuf[i]);
+    i===0?ctxH.moveTo(x,y):ctxH.lineTo(x,y);
+  }
+  ctxH.stroke();
+
+  // Baseline
+  ctxH.strokeStyle='rgba(245,166,35,0.25)'; ctxH.lineWidth=0.8;
+  ctxH.setLineDash([4,6]);
+  ctxH.beginPath(); ctxH.moveTo(0,scaleY(850)); ctxH.lineTo(W,scaleY(850));
+  ctxH.stroke(); ctxH.setLineDash([]);
+}
+
+// ── CLI sparkline ─────────────────────────────────────────
+function drawCLISparkline(latest) {
+  const cv = document.getElementById('cli-sparkline');
+  const W=cv.width, H=cv.height;
+  ctxCLI.clearRect(0,0,W,H);
+
+  const hist = Array.from(cliBuf.slice(-W));
+  ctxCLI.beginPath();
+  const grd=ctxCLI.createLinearGradient(0,0,W,0);
+  grd.addColorStop(0,'rgba(52,211,153,0.6)');
+  grd.addColorStop(0.5,'rgba(245,166,35,0.8)');
+  grd.addColorStop(1,'rgba(248,113,113,0.9)');
+  ctxCLI.strokeStyle=grd; ctxCLI.lineWidth=1.5;
+  hist.forEach((v,i)=>{
+    const x=i/hist.length*W, y=H-(v*(H-2))-1;
+    i===0?ctxCLI.moveTo(x,y):ctxCLI.lineTo(x,y);
+  });
+  ctxCLI.stroke();
+}
+
+// ── KPI sparklines ────────────────────────────────────────
+const kpiSparkCfg = {
+  AE:{id:'sp-AE',color:'#34d399',min:0,max:4},
+  CS:{id:'sp-CS',color:'#f5a623',min:0,max:2},
+  IY:{id:'sp-IY',color:'#22d3ee',min:0,max:100},
+  PF:{id:'sp-PF',color:'#f87171',min:-0.5,max:3},
+};
+function drawKPISparks() {
+  for (const [key, cfg] of Object.entries(kpiSparkCfg)) {
+    const cv = document.getElementById(cfg.id);
+    if (!cv) continue;
+    const W = cv.offsetWidth||120, H = cv.offsetHeight||28;
+    cv.width=W; cv.height=H;
+    const ctx2 = cv.getContext('2d');
+    ctx2.clearRect(0,0,W,H);
+    const data = kpiHist[key];
+    if (data.length < 2) continue;
+    const range = cfg.max-cfg.min;
+    ctx2.beginPath(); ctx2.strokeStyle=cfg.color; ctx2.lineWidth=1.2;
+    data.forEach((v,i)=>{
+      const x=i/(data.length-1)*W;
+      const y=H-((clamp(v,cfg.min,cfg.max)-cfg.min)/range*(H-2))-1;
+      i===0?ctx2.moveTo(x,y):ctx2.lineTo(x,y);
+    });
+    ctx2.stroke();
+  }
+}
+
+// ── Gauge update ──────────────────────────────────────────
+function updateGauge(cli, z) {
+  const ARC_LEN = 172.79;
+  const fill = document.getElementById('gauge-fill');
+  const needle = document.getElementById('gauge-needle');
+  const offset = ARC_LEN * (1 - cli);
+  fill.setAttribute('stroke-dashoffset', offset.toFixed(2));
+
+  // Needle angle: -90deg = 0, 0deg = 0.5, +90deg = 1 (all relative to bottom)
+  const angle = -90 + cli * 180; // degrees
+  const rad = (angle - 90) * Math.PI / 180;
+  const r = 48;
+  const nx2 = 65 + r * Math.cos(rad);
+  const ny2 = 100 + r * Math.sin(rad);
+  needle.setAttribute('x2', nx2.toFixed(1));
+  needle.setAttribute('y2', ny2.toFixed(1));
+
+  const bigEl = document.getElementById('cli-big');
+  bigEl.textContent = cli.toFixed(3);
+  const state = cli < 0.3 ? 'LOW LOAD' : cli < 0.55 ? 'MODERATE' : cli < 0.75 ? 'HIGH LOAD' : 'CRITICAL';
+  const stateCol = cli < 0.3 ? '#34d399' : cli < 0.55 ? '#f5a623' : cli < 0.75 ? '#f5a623' : '#f87171';
+  document.getElementById('cli-state').textContent = state;
+  document.getElementById('cli-state').style.color = stateCol;
+  bigEl.style.color = stateCol;
+  bigEl.style.textShadow = `0 0 20px ${stateCol}77`;
+}
+
+// ── HUD value updates ─────────────────────────────────────
+function updateHUDs(pL, pR, rr, rmssd, tepr, hrvs, z, cli, kpis) {
+  const mean = (pL+pR)/2;
+  const pupilEl = document.getElementById('pupil-val');
+  pupilEl.textContent = mean.toFixed(1)+'mm';
+  pupilEl.className = 'wave-val' + (mean > 6.5 ? ' warn' : mean > 7.5 ? ' alert' : '');
+  document.getElementById('pl-val').textContent = pL.toFixed(2)+'mm';
+  document.getElementById('pr-val').textContent = pR.toFixed(2)+'mm';
+  document.getElementById('conf-val').textContent = (0.88 + Math.random()*0.1).toFixed(2);
+  document.getElementById('tepr-val').textContent = (tepr>=0?'+':'')+tepr.toFixed(3);
+
+  const hr = Math.round(60000/rr);
+  document.getElementById('hr-val').textContent = hr;
+  document.getElementById('rmssd-val').textContent = Math.round(rmssd)+'ms';
+  document.getElementById('rr-val').textContent = Math.round(rr)+'ms';
+  document.getElementById('hrvs-val').textContent = hrvs.toFixed(3);
+
+  document.getElementById('ci-tepr').textContent = tepr.toFixed(4);
+  document.getElementById('ci-hrvs').textContent = hrvs.toFixed(4);
+  document.getElementById('ci-z').textContent = z.toFixed(4);
+
+  // KPIs
+  const fmt = (v,d=3)=> isFinite(v)?v.toFixed(d):'—';
+  document.getElementById('kv-AE').textContent = fmt(kpis.AE);
+  document.getElementById('kv-CS').textContent = fmt(kpis.CS);
+  document.getElementById('kv-IY').textContent = fmt(kpis.IY,1)+'%';
+  document.getElementById('kv-PF').textContent = fmt(kpis.PF);
+  document.getElementById('kb-AE').style.width = clamp(kpis.AE/4*100,0,100)+'%';
+  document.getElementById('kb-CS').style.width = clamp(kpis.CS/2*100,0,100)+'%';
+  document.getElementById('kb-IY').style.width = clamp(kpis.IY,0,100)+'%';
+  document.getElementById('kb-PF').style.width = clamp(kpis.PF/4*100,0,100)+'%';
+}
+
+// ── Request log ───────────────────────────────────────────
+const endpoints = ['/api/biometrics/pupil', '/api/biometrics/hrv'];
+const stream = document.getElementById('req-stream');
+let reqBuf = [];
+
+function emitRequest() {
+  totalReqs++;
+  const isPupil = Math.random() > 0.12;
+  const ep = isPupil ? '/pupil' : '/hrv';
+  const isErr = Math.random() < 0.015;
+  const latency = Math.round(2 + Math.random()*5);
+  const batchSz = isPupil ? Math.round(4+Math.random()*4) : 1;
+
+  if (isErr) errCount[isPupil?0:1]++;
+
+  const ts = new Date().toISOString().slice(11,23);
+  const bodyStr = isPupil
+    ? `batch=${batchSz} pupil_l=${(4+Math.random()*3).toFixed(2)}`
+    : `rr=${Math.round(700+Math.random()*300)}ms hr=${Math.round(55+Math.random()*40)}`;
+
+  reqBuf.unshift({ ts, ep, body:bodyStr, status:isErr?422:200, ms:latency });
+  if (reqBuf.length > 40) reqBuf.pop();
+
+  stream.innerHTML = reqBuf.map(r=>`
+    <div class="req-item">
+      <span class="req-ts">${r.ts}</span>
+      <span class="req-body"><b style="color:var(--amber)">${r.ep}</b> ${r.body}</span>
+      <span class="req-status ${r.status===200?'s200':'s422'}">${r.status} ${r.ms}ms</span>
+    </div>`).join('');
+
+  document.getElementById('total-req').textContent = totalReqs+' reqs';
+  document.getElementById('err-pupil').textContent = errCount[0];
+  document.getElementById('err-hrv').textContent   = errCount[1];
+
+  // Vary shown RPS
+  if (totalReqs % 15 === 0) {
+    document.getElementById('rps-pupil').textContent = Math.round(55+Math.random()*14);
+    document.getElementById('p50-pupil').textContent = Math.round(2+Math.random()*5)+'ms';
+    document.getElementById('rps-hrv').textContent   = Math.round(3+Math.random()*3);
+    document.getElementById('p50-hrv').textContent   = Math.round(1+Math.random()*3)+'ms';
+  }
+}
+
+function updateRuntime() {
+  const s = Math.floor((Date.now()-startTime)/1000);
+  const h=String(Math.floor(s/3600)).padStart(2,'0');
+  const m=String(Math.floor((s%3600)/60)).padStart(2,'0');
+  const ss=String(s%60).padStart(2,'0');
+  document.getElementById('runtime').textContent = `${h}:${m}:${ss}`;
+}
+
+tick();
+</script>
+</body>
+</html>

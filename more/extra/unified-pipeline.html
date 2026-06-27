@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UNIFIED PIPELINE — Concept Genesis to Human Assimilation</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne+Mono&family=Syne:wght@400;700;800&display=swap');
+
+:root {
+  /* Domain colors */
+  --d1:    #00e5ff;   /* Genesis — cyan */
+  --d1d:   rgba(0,229,255,0.15);
+  --d1dd:  rgba(0,229,255,0.06);
+  --d2:    #c084fc;   /* Semiotics — violet */
+  --d2d:   rgba(192,132,252,0.15);
+  --d2dd:  rgba(192,132,252,0.06);
+  --d3:    #fb923c;   /* Cognitive — amber */
+  --d3d:   rgba(251,146,60,0.15);
+  --d3dd:  rgba(251,146,60,0.06);
+  /* Shared */
+  --bg:    #01030a;
+  --bg2:   #030810;
+  --text:  #ccd9e4;
+  --dim:   rgba(204,217,228,0.38);
+  --border:#0d1a26;
+  --green: #4ade80;
+  --red:   #f87171;
+  --mono:  'Syne Mono', monospace;
+  --sans:  'Syne', sans-serif;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--mono);font-size:11px;}
+
+/* Grain */
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.032'/%3E%3C/svg%3E");}
+body::after{content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.010) 2px,rgba(0,0,0,0.010) 4px);}
+
+/* ── LAYOUT ─────────────────────────────── */
+#app{display:grid;grid-template-rows:44px 1fr 1fr;grid-template-columns:1fr;height:100vh;position:relative;z-index:1;}
+
+/* ── HEADER ─────────────────────────────── */
+#hdr{display:flex;align-items:center;padding:0 18px;gap:0;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  background:rgba(1,3,10,0.98);}
+#hdr-title{font-family:var(--sans);font-weight:800;font-size:12px;letter-spacing:3px;text-transform:uppercase;
+  background:linear-gradient(90deg,var(--d1),var(--d2),var(--d3));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin-right:28px;white-space:nowrap;}
+.hdr-sep{width:1px;height:22px;background:rgba(255,255,255,0.07);margin:0 16px;flex-shrink:0;}
+.hdr-metric{display:flex;flex-direction:column;align-items:flex-start;gap:1px;flex-shrink:0;}
+.hm-key{font-size:7.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);}
+.hm-val{font-family:var(--sans);font-size:12px;font-weight:700;}
+.pulse-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:5px;animation:pdot 1.6s ease infinite;}
+@keyframes pdot{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.3;transform:scale(.7);}}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:14px;}
+.phase-indicator{
+  padding:3px 10px;border-radius:2px;font-size:8px;letter-spacing:2px;text-transform:uppercase;font-weight:700;
+  border:1px solid;
+}
+.pi-1{color:var(--d1);border-color:var(--d1);background:var(--d1dd);}
+.pi-2{color:var(--d2);border-color:var(--d2);background:var(--d2dd);}
+.pi-3{color:var(--d3);border-color:var(--d3);background:var(--d3dd);}
+.tension-warn{color:var(--red);border-color:var(--red);background:rgba(248,113,113,0.06);animation:twarn 2s ease infinite;}
+@keyframes twarn{0%,100%{opacity:1;}50%{opacity:.6;}}
+
+/* ── TOP ROW: Three domains + flow ── */
+#row-top{display:grid;grid-template-columns:1fr 72px 1fr 72px 1fr;gap:0;overflow:hidden;}
+
+/* ── DOMAIN PANELS ── */
+.domain{display:flex;flex-direction:column;overflow:hidden;border-right:1px solid rgba(255,255,255,0.04);}
+.domain:last-child{border-right:none;}
+.d-head{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;border-bottom:1px solid rgba(255,255,255,0.05);}
+.d-label{font-family:var(--sans);font-size:8px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;}
+.d-phase{font-size:7.5px;color:var(--dim);letter-spacing:1px;}
+.d1 .d-head{background:var(--d1dd);}
+.d2 .d-head{background:var(--d2dd);}
+.d3 .d-head{background:var(--d3dd);}
+.d1 .d-label{color:var(--d1);}
+.d2 .d-label{color:var(--d2);}
+.d3 .d-label{color:var(--d3);}
+
+.d-body{flex:1;display:grid;grid-template-rows:1fr 1fr;gap:0;overflow:hidden;}
+.d-cell{border-bottom:1px solid rgba(255,255,255,0.04);padding:8px 10px;overflow:hidden;position:relative;}
+.d-cell:last-child{border-bottom:none;}
+.cell-label{font-size:7.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);margin-bottom:4px;}
+.big-num{font-family:var(--sans);font-size:26px;font-weight:800;line-height:1;}
+.big-sub{font-size:8px;color:var(--dim);margin-top:3px;}
+.mini-canvas-wrap{height:46px;margin-top:4px;}
+.mini-cv{display:block;width:100%;height:100%;}
+
+/* Node strip (D1) */
+.node-strip{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px;}
+.node-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:all 0.3s;}
+
+/* Prime strip (D3) */
+.prime-strip{display:flex;gap:2px;flex-wrap:wrap;margin-top:4px;height:44px;overflow:hidden;align-content:start;}
+.prime-chip{font-size:7px;padding:1px 4px;border-radius:1px;border:1px solid;transition:all 0.4s;white-space:nowrap;}
+.pc-hot {color:#fff;background:var(--d3d);border-color:var(--d3);}
+.pc-warm{color:var(--d3);background:transparent;border-color:rgba(251,146,60,0.25);}
+.pc-off {color:var(--dim);background:transparent;border-color:rgba(255,255,255,0.05);}
+
+/* ── FLOW CONNECTORS ── */
+.flow-col{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative;overflow:hidden;}
+.flow-col canvas{display:block;}
+.flow-label{font-size:7px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);text-align:center;line-height:1.5;}
+
+/* ── BOTTOM ROW ── */
+#row-bot{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border-top:1px solid rgba(255,255,255,0.05);overflow:hidden;}
+.bot-panel{overflow:hidden;display:flex;flex-direction:column;border-right:1px solid rgba(255,255,255,0.05);}
+.bot-panel:last-child{border-right:none;}
+.bp-head{display:flex;align-items:center;justify-content:space-between;padding:5px 12px;border-bottom:1px solid rgba(255,255,255,0.05);
+  font-family:var(--sans);font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;}
+.bp-head span{font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:0;font-weight:400;}
+
+/* pgvector scatter */
+#pv-wrap{flex:1;position:relative;overflow:hidden;}
+#pv-canvas{display:block;width:100%;height:100%;}
+.pv-legend{position:absolute;bottom:8px;right:10px;font-size:8px;display:flex;flex-direction:column;gap:3px;}
+.pv-leg-item{display:flex;align-items:center;gap:5px;color:var(--dim);}
+.pv-dot{width:7px;height:7px;border-radius:50%;}
+
+/* Tensions */
+.tension-block{padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.04);}
+.tb-title{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;}
+.tb-name{font-family:var(--sans);font-size:9px;font-weight:700;letter-spacing:1px;}
+.tb-subtitle{font-size:7.5px;color:var(--dim);}
+.tension-meter{height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;position:relative;}
+.tm-fill{height:100%;border-radius:3px;transition:width 0.6s ease;}
+.tm-threshold{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.25);}
+.tension-readout{display:flex;justify-content:space-between;margin-top:4px;font-size:8px;}
+.tr-left{color:var(--dim);}
+.tr-right{}
+
+.middleware-block{padding:8px 12px;}
+.mw-title{font-family:var(--sans);font-size:8px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text);margin-bottom:8px;}
+.mw-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.mw-label{font-size:8px;color:var(--dim);width:100px;flex-shrink:0;}
+input[type=range]{-webkit-appearance:none;flex:1;height:3px;background:rgba(255,255,255,0.1);border-radius:2px;outline:none;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;border-radius:50%;cursor:pointer;transition:transform 0.1s;}
+.mw-val{font-size:10px;width:36px;text-align:right;}
+.sdr-display{margin-top:6px;padding:6px 8px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:2px;}
+.sdr-row{display:flex;justify-content:space-between;font-size:8.5px;margin-bottom:2px;}
+.sdr-key{color:var(--dim);}
+.sdr-val{font-family:var(--sans);font-weight:700;}
+
+/* Closed loop sandbox */
+.sandbox-flow{flex:1;position:relative;overflow:hidden;}
+#sb-canvas{display:block;width:100%;height:100%;}
+.sb-overlay{position:absolute;inset:0;pointer-events:none;}
+.prt-badge{
+  position:absolute;font-size:8px;padding:2px 7px;border-radius:2px;border:1px solid;
+  white-space:nowrap;transform:translate(-50%,-50%);pointer-events:none;
+  transition:all 0.5s;
+}
+
+.assimilation-bar{padding:6px 12px;border-top:1px solid rgba(255,255,255,0.04);display:flex;gap:10px;align-items:center;}
+.ab-label{font-size:8px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;white-space:nowrap;}
+.ab-track{flex:1;height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;}
+.ab-fill{height:100%;border-radius:3px;transition:width 0.6s ease;}
+.ab-val{font-size:9px;font-family:var(--sans);font-weight:700;min-width:30px;text-align:right;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ HEADER ══════════════════════════════════════════ -->
+  <header id="hdr">
+    <div id="hdr-title">Unified Genesis → Assimilation Pipeline</div>
+    <div class="hdr-sep"></div>
+    <div class="hdr-metric">
+      <div class="hm-key">Pipeline</div>
+      <div class="hm-val"><span class="pulse-dot" style="background:var(--green)"></span><span style="color:var(--green)">ACTIVE</span></div>
+    </div>
+    <div class="hdr-sep"></div>
+    <div class="hdr-metric">
+      <div class="hm-key">SDR Index</div>
+      <div class="hm-val" id="sdr-hdr" style="color:var(--d2)">—</div>
+    </div>
+    <div class="hdr-sep"></div>
+    <div class="hdr-metric">
+      <div class="hm-key">CLI Live</div>
+      <div class="hm-val" id="cli-hdr" style="color:var(--d3)">—</div>
+    </div>
+    <div class="hdr-sep"></div>
+    <div class="hdr-metric">
+      <div class="hm-key">ICVP Commits</div>
+      <div class="hm-val" id="commits-hdr" style="color:var(--d1)">0</div>
+    </div>
+    <div class="hdr-sep"></div>
+    <div class="hdr-metric">
+      <div class="hm-key">Calib. Ratio</div>
+      <div class="hm-val" id="calib-hdr" style="color:var(--d2)">—</div>
+    </div>
+    <div class="hdr-right">
+      <div class="phase-indicator pi-1">D1 GENESIS</div>
+      <div class="phase-indicator pi-2">D2 SEMIOTIC</div>
+      <div class="phase-indicator pi-3">D3 COGNITIVE</div>
+      <div class="phase-indicator tension-warn" id="tension-badge">⚡ TENSION ACTIVE</div>
+    </div>
+  </header>
+
+  <!-- ══ TOP ROW ══════════════════════════════════════════ -->
+  <div id="row-top">
+
+    <!-- D1 Domain -->
+    <div class="domain d1">
+      <div class="d-head">
+        <div class="d-label">Domain 1 — Genesis Core</div>
+        <div class="d-phase" id="d1-phase">RSE → AIAN → ICVP</div>
+      </div>
+      <div class="d-body">
+        <div class="d-cell">
+          <div class="cell-label">Novelty Score (AIAN)</div>
+          <div class="big-num" id="d1-novelty" style="color:var(--d1)">0.000</div>
+          <div class="big-sub">cosine distance from archetype space</div>
+          <div class="node-strip" id="node-strip"></div>
+        </div>
+        <div class="d-cell">
+          <div class="cell-label">ICVP Consensus</div>
+          <div class="big-num" id="d1-consensus" style="color:var(--green)">—%</div>
+          <div class="big-sub" id="d1-topo">T(2,3) · β₀=1 · β₁=1 · Q=2</div>
+          <div class="mini-canvas-wrap"><canvas class="mini-cv" id="cv-d1-spark"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flow D1→D2 -->
+    <div class="flow-col" id="flow-12">
+      <canvas id="cv-flow-12" width="72" height="100%"></canvas>
+      <div class="flow-label" style="position:absolute;bottom:6px;font-size:7px;letter-spacing:1px;color:var(--dim);">PRT<br>→TMFT</div>
+    </div>
+
+    <!-- D2 Domain -->
+    <div class="domain d2">
+      <div class="d-head">
+        <div class="d-label">Domain 2 — Semiotic Bridge</div>
+        <div class="d-phase" id="d2-phase">TMFT · Hopfion · FPGA</div>
+      </div>
+      <div class="d-body">
+        <div class="d-cell" style="position:relative;padding:0;overflow:hidden;">
+          <canvas id="cv-hopfion" style="display:block;width:100%;height:100%;"></canvas>
+          <div style="position:absolute;top:6px;left:10px;font-size:7.5px;color:var(--d2);letter-spacing:1px;">LIVE HOPFION</div>
+          <div style="position:absolute;top:6px;right:10px;font-size:8px;color:var(--dim);text-align:right;">
+            <span id="d2-freq">f=0.4Hz</span><br>
+            <span id="d2-genus">g=0</span>
+          </div>
+        </div>
+        <div class="d-cell">
+          <div class="cell-label">Topological Betti Profile</div>
+          <div style="display:flex;gap:12px;margin-top:2px;">
+            <div><div style="font-size:8px;color:var(--dim)">β₀</div><div class="big-num" id="d2-b0" style="font-size:20px;color:var(--d2)">1</div></div>
+            <div><div style="font-size:8px;color:var(--dim)">β₁</div><div class="big-num" id="d2-b1" style="font-size:20px;color:var(--d2)">1</div></div>
+            <div><div style="font-size:8px;color:var(--dim)">K</div><div class="big-num" id="d2-k" style="font-size:20px;color:var(--d2)">0.0</div></div>
+            <div><div style="font-size:8px;color:var(--dim)">W</div><div class="big-num" id="d2-w" style="font-size:20px;color:var(--d2)">0.00</div></div>
+          </div>
+          <div class="mini-canvas-wrap"><canvas class="mini-cv" id="cv-d2-spark"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flow D2→D3 -->
+    <div class="flow-col" id="flow-23">
+      <canvas id="cv-flow-23" width="72" height="100%"></canvas>
+      <div class="flow-label" style="position:absolute;bottom:6px;font-size:7px;letter-spacing:1px;color:var(--dim);">CALIB<br>→CRIM</div>
+    </div>
+
+    <!-- D3 Domain -->
+    <div class="domain d3">
+      <div class="d-head">
+        <div class="d-label">Domain 3 — Cognitive Assimilation</div>
+        <div class="d-phase" id="d3-phase">CRIM · CLI · KPIs</div>
+      </div>
+      <div class="d-body">
+        <div class="d-cell">
+          <div class="cell-label">Cognitive Load Index</div>
+          <div class="big-num" id="d3-cli" style="color:var(--d3)">0.000</div>
+          <div class="big-sub" id="d3-state">LOW LOAD — flow state active</div>
+          <div class="mini-canvas-wrap"><canvas class="mini-cv" id="cv-d3-cli"></canvas></div>
+        </div>
+        <div class="d-cell">
+          <div class="cell-label">Active Semantic Primes</div>
+          <div class="prime-strip" id="prime-strip"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ BOTTOM ROW ══════════════════════════════════════ -->
+  <div id="row-bot">
+
+    <!-- pgvector Latent Space -->
+    <div class="bot-panel">
+      <div class="bp-head" style="color:var(--d2);">pgvector Latent Space Merge <span>1536-DIM → t-SNE 2D</span></div>
+      <div id="pv-wrap">
+        <canvas id="pv-canvas"></canvas>
+        <div class="pv-legend">
+          <div class="pv-leg-item"><div class="pv-dot" style="background:var(--d1)"></div>PRT embeddings</div>
+          <div class="pv-leg-item"><div class="pv-dot" style="background:var(--d3)"></div>Semantic primes</div>
+          <div class="pv-leg-item"><div class="pv-dot" style="background:var(--d2)"></div>Bridge points</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Strategic Tensions + Middleware -->
+    <div class="bot-panel">
+      <div class="bp-head" style="color:var(--red);">Strategic Tensions <span>CALIB MIDDLEWARE</span></div>
+
+      <div class="tension-block">
+        <div class="tb-title">
+          <div class="tb-name" style="color:var(--red)">T1 — Novelty vs. Familiarity</div>
+          <div class="tb-subtitle">D1↔D3</div>
+        </div>
+        <div class="tension-meter">
+          <div class="tm-fill" id="t1-fill" style="background:linear-gradient(90deg,var(--d1),var(--red));width:50%"></div>
+          <div class="tm-threshold" style="left:40%"></div>
+        </div>
+        <div class="tension-readout">
+          <span class="tr-left">← AIAN purity</span>
+          <span id="t1-val" style="color:var(--red)">—</span>
+          <span class="tr-left">UMD scaffold →</span>
+        </div>
+      </div>
+
+      <div class="tension-block">
+        <div class="tb-title">
+          <div class="tb-name" style="color:var(--red)">T2 — Integrity vs. Dilution</div>
+          <div class="tb-subtitle">D2↔D3</div>
+        </div>
+        <div class="tension-meter">
+          <div class="tm-fill" id="t2-fill" style="background:linear-gradient(90deg,var(--d2),var(--d3));width:50%"></div>
+          <div class="tm-threshold" style="left:60%"></div>
+        </div>
+        <div class="tension-readout">
+          <span class="tr-left">← TMFT integrity</span>
+          <span id="t2-val" style="color:var(--d2)">—</span>
+          <span class="tr-left">CLI throttle →</span>
+        </div>
+      </div>
+
+      <div class="middleware-block">
+        <div class="mw-title">Abstraction Calibration Middleware</div>
+        <div class="mw-row">
+          <div class="mw-label" style="color:var(--d1)">PRT Purity</div>
+          <input type="range" id="sl-purity" min="0" max="100" value="72" style="accent-color:var(--d1);">
+          <input type="range" id="sl-purity" min="0" max="100" value="72">
+          <div class="mw-val" id="v-purity" style="color:var(--d1)">0.72</div>
+        </div>
+        <div class="mw-row">
+          <div class="mw-label" style="color:var(--d3)">CLI Ceiling</div>
+          <input type="range" id="sl-ceiling" min="30" max="90" value="60">
+          <div class="mw-val" id="v-ceiling" style="color:var(--d3)">0.60</div>
+        </div>
+        <div class="sdr-display">
+          <div class="sdr-row"><span class="sdr-key">Semantic Dist. Reduction</span><span class="sdr-val" id="sdr-val" style="color:var(--d2)">—</span></div>
+          <div class="sdr-row"><span class="sdr-key">Structural Loss</span><span class="sdr-val" id="struct-loss" style="color:var(--red)">—</span></div>
+          <div class="sdr-row"><span class="sdr-key">Calib. Ratio</span><span class="sdr-val" id="calib-ratio" style="color:var(--green)">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Closed Loop Sandbox -->
+    <div class="bot-panel">
+      <div class="bp-head" style="color:var(--green);">Proof-of-Utility Sandbox <span id="sandbox-count">0/5 PRTs</span></div>
+      <div class="sandbox-flow">
+        <canvas id="sb-canvas"></canvas>
+      </div>
+      <div class="assimilation-bar">
+        <div class="ab-label">Assim. Vel.</div>
+        <div class="ab-track"><div class="ab-fill" id="ab-av" style="background:var(--green);width:0%"></div></div>
+        <div class="ab-val" id="av-val" style="color:var(--green)">—</div>
+
+        <div class="ab-label">Schema Exp.</div>
+        <div class="ab-track"><div class="ab-fill" id="ab-se" style="background:var(--d2);width:0%"></div></div>
+        <div class="ab-val" id="se-val" style="color:var(--d2)">—</div>
+
+        <div class="ab-label">Homeostasis</div>
+        <div class="ab-track"><div class="ab-fill" id="ab-bh" style="background:var(--d3);width:0%"></div></div>
+        <div class="ab-val" id="bh-val" style="color:var(--d3)">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<script>
+'use strict';
+const NSM_PRIMES=['I','YOU','SOMEONE','SOMETHING','PEOPLE','BODY','KIND','PART','THIS','SAME',
+  'OTHER','ONE','TWO','MUCH','MANY','ALL','GOOD','BAD','BIG','SMALL','THINK','KNOW',
+  'WANT','FEEL','SEE','HEAR','SAY','WORDS','TRUE','DO','HAPPEN','MOVE','THERE','HERE',
+  'WHEN','NOW','BEFORE','AFTER','LONG','SHORT','FAR','NEAR','SIDE','INSIDE','ABOVE',
+  'BELOW','LIVE','DIE','TIME','PLACE','WORLD','NOT','MAYBE','CAN','BECAUSE','IF',
+  'LIKE','HOW','VERY','MORE','HAVE','BE','WHERE','SAME','DIFFERENT'];
+
+// ── Utils ────────────────────────────────────────
+function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v));}
+function lerp(a,b,t){return a+(b-a)*t;}
+function rnd(a,b){return a+Math.random()*(b-a);}
+function sigmoid(x){return 1/(1+Math.exp(-x));}
+
+// ── Global sim state ─────────────────────────────
+let t=0, prevNow=performance.now();
+let cogLoad=0.35, loadTarget=0.35, loadChangeT=10;
+let noveltySmooth=0.72, noveltyTarget=0.8;
+let cliSmooth=0.30, tepr=0, hrvs=0;
+let icvpCommits=0, commitTimer=0;
+let d2p=2,d2q=3,d2f=0.4,d2g=0,d2W=0,d2K=1.5;
+let d2pS=2,d2qS=3; // smoothed
+
+// Histories
+const CLI_H=new Float32Array(180).fill(0.3);
+const D1_H=new Float32Array(120).fill(0.72);
+const D2_H=new Float32Array(120).fill(0.5);
+let pvPoints=[], pvInit=false;
+let sbPRTs=[];
+let aVel=0,sExp=0,biHom=0.7;
+
+// Middleware sliders
+let purity=0.72, cliCeiling=0.60;
+
+// ── Slider wiring ────────────────────────────────
+document.getElementById('sl-purity').addEventListener('input',e=>{
+  purity=e.target.value/100;
+  document.getElementById('v-purity').textContent=purity.toFixed(2);
+});
+document.getElementById('sl-ceiling').addEventListener('input',e=>{
+  cliCeiling=e.target.value/100;
+  document.getElementById('v-ceiling').textContent=cliCeiling.toFixed(2);
+});
+
+// ── Canvas resize helper ─────────────────────────
+function resizeCv(cv){
+  const w=cv.parentElement.offsetWidth,h=cv.parentElement.offsetHeight;
+  if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h;}
+}
+
+// ── D1 Node strip init ───────────────────────────
+const nodeStrip=document.getElementById('node-strip');
+for(let i=0;i<24;i++){
+  const d=document.createElement('div');
+  d.className='node-dot';d.id='nd-'+i;
+  d.style.background='rgba(0,229,255,0.12)';
+  d.style.border='1px solid rgba(0,229,255,0.15)';
+  nodeStrip.appendChild(d);
+}
+
+// ── D3 Primes strip init ─────────────────────────
+const primeStrip=document.getElementById('prime-strip');
+NSM_PRIMES.forEach((p,i)=>{
+  const el=document.createElement('div');
+  el.className='prime-chip pc-off';el.id='prc-'+i;el.textContent=p;
+  primeStrip.appendChild(el);
+});
+
+// ── pgvector scatter init ─────────────────────────
+function initPVPoints(){
+  pvPoints=[];
+  // PRT embeddings cluster (D1 - cyan) — upper-left
+  for(let i=0;i<30;i++) pvPoints.push({x:rnd(0.08,0.38),y:rnd(0.08,0.55),type:'prt',label:`P${i}`});
+  // Semantic primes (D3 - amber) — lower-right
+  for(let i=0;i<25;i++) pvPoints.push({x:rnd(0.55,0.92),y:rnd(0.42,0.88),type:'sem',label:NSM_PRIMES[i%65]});
+  // Bridge points (D2 - violet) — middle band
+  for(let i=0;i<12;i++) pvPoints.push({x:rnd(0.28,0.68),y:rnd(0.18,0.72),type:'bridge',label:`B${i}`});
+  pvInit=true;
+}
+initPVPoints();
+
+// ── Sandbox PRT particles ─────────────────────────
+function emitSBPRT(){
+  if(sbPRTs.length>=12) return;
+  sbPRTs.push({x:0.05,y:rnd(0.15,0.85),vx:rnd(0.0008,0.0018),vy:0,phase:0,cli:0,alpha:1,committed:false});
+  icvpCommits++;
+  document.getElementById('commits-hdr').textContent=icvpCommits;
+  document.getElementById('sandbox-count').textContent=Math.min(icvpCommits,99)+'/5+ PRTs';
+}
+setTimeout(emitSBPRT,1000);
+setInterval(emitSBPRT,rnd(3500,6000));
+
+// ── Hopfion 2D canvas ─────────────────────────────
+const cvH=document.getElementById('cv-hopfion');
+const ctxH2=cvH.getContext('2d');
+
+function drawHopfion2D(p,q,t3,W){
+  const W2=cvH.offsetWidth,H2=cvH.offsetHeight;
+  if(cvH.width!==W2||cvH.height!==H2){cvH.width=W2;cvH.height=H2;}
+  ctxH2.clearRect(0,0,W2,H2);
+  // Dark bg
+  const rg=ctxH2.createRadialGradient(W2/2,H2/2,0,W2/2,H2/2,H2*0.6);
+  rg.addColorStop(0,'rgba(20,5,40,0.7)');
+  rg.addColorStop(1,'rgba(1,3,10,0)');
+  ctxH2.fillStyle=rg;ctxH2.fillRect(0,0,W2,H2);
+
+  if(W2<2||H2<2) return;
+  const cx=W2/2,cy=H2/2;
+  const R=Math.min(W2,H2)*0.28,r=Math.min(W2,H2)*0.10;
+
+  const hue=(0.5+W*0.22)*360;
+  const STEPS=220;
+  ctxH2.beginPath();
+  let first=true;
+  for(let i=0;i<=STEPS;i++){
+    const a=(i/STEPS)*Math.PI*2;
+    const x=(R+r*Math.cos(q*a+t3*0.8))*Math.cos(p*a+t3*0.3);
+    const y=(R+r*Math.cos(q*a+t3*0.8))*Math.sin(p*a+t3*0.3);
+    if(!isFinite(x)||!isFinite(y))continue;
+    const sx=cx+x,sy=cy+y*0.62;
+    first?(ctxH2.moveTo(sx,sy),first=false):ctxH2.lineTo(sx,sy);
+  }
+  const grd=ctxH2.createLinearGradient(cx-R,cy,cx+R,cy);
+  grd.addColorStop(0,`hsla(${hue},90%,65%,0.9)`);
+  grd.addColorStop(0.5,`hsla(${(hue+40)%360},95%,75%,0.95)`);
+  grd.addColorStop(1,`hsla(${(hue+80)%360},90%,60%,0.9)`);
+  ctxH2.strokeStyle=grd;ctxH2.lineWidth=1.8;ctxH2.stroke();
+
+  // Inner orbit
+  ctxH2.beginPath();first=true;
+  for(let i=0;i<=STEPS;i++){
+    const a=(i/STEPS)*Math.PI*2;
+    const x2=(R*0.55+r*0.6*Math.cos(q*a-t3*1.1))*Math.cos(p*a+1+t3*0.5);
+    const y2=(R*0.55+r*0.6*Math.cos(q*a-t3*1.1))*Math.sin(p*a+1+t3*0.5);
+    if(!isFinite(x2)||!isFinite(y2))continue;
+    const sx2=cx+x2,sy2=cy+y2*0.62;
+    first?(ctxH2.moveTo(sx2,sy2),first=false):ctxH2.lineTo(sx2,sy2);
+  }
+  ctxH2.strokeStyle=`hsla(${(hue+180)%360},80%,55%,0.45)`;
+  ctxH2.lineWidth=0.9;ctxH2.stroke();
+}
+
+// ── Flow connector canvas ─────────────────────────
+const cvF12=document.getElementById('cv-flow-12');
+const cvF23=document.getElementById('cv-flow-23');
+
+function drawFlowConnector(canvas,colorA,colorB,packets,t3){
+  const W2=canvas.parentElement.offsetWidth,H2=canvas.parentElement.offsetHeight;
+  if(canvas.width!==W2||canvas.height!==H2){canvas.width=W2;canvas.height=H2;}
+  if(W2<1||H2<1) return;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W2,H2);
+  // Arrow line
+  const x=W2/2;
+  const grd=ctx.createLinearGradient(x,0,x,H2);
+  grd.addColorStop(0,colorA+'88');grd.addColorStop(1,colorB+'88');
+  ctx.beginPath();ctx.moveTo(x,8);ctx.lineTo(x,H2-8);
+  ctx.strokeStyle=grd;ctx.lineWidth=1;ctx.setLineDash([4,6]);ctx.stroke();ctx.setLineDash([]);
+  // Arrowhead
+  ctx.beginPath();ctx.moveTo(x,H2-5);ctx.lineTo(x-4,H2-14);ctx.lineTo(x+4,H2-14);ctx.closePath();
+  ctx.fillStyle=colorB+'aa';ctx.fill();
+  // Packets
+  for(let i=0;i<3;i++){
+    const phase=((t3*0.25+i/3)%1);
+    const py=8+phase*(H2-16);
+    if(!isFinite(py)) continue;
+    ctx.beginPath();ctx.arc(x,py,3,0,Math.PI*2);
+    const alpha=Math.sin(phase*Math.PI);
+    ctx.fillStyle=colorA+(Math.round(alpha*200).toString(16).padStart(2,'0'));
+    ctx.fill();
+  }
+}
+
+// ── pgvector scatter draw ─────────────────────────
+const pvCv=document.getElementById('pv-canvas');
+const pvCtx=pvCv.getContext('2d');
+let pvDriftT=0;
+
+function drawPVScatter(t3){
+  resizeCv(pvCv);
+  const W2=pvCv.width,H2=pvCv.height;
+  if(W2<2||H2<2) return;
+  pvCtx.clearRect(0,0,W2,H2);
+  pvDriftT+=0.004;
+
+  const typeCol={'prt':getComputedStyle(document.documentElement).getPropertyValue('--d1').trim()||'#00e5ff',
+                 'sem':'#fb923c','bridge':'#c084fc'};
+  const typeR={'prt':4,'sem':3.5,'bridge':3};
+
+  // Draw bridge lines first
+  pvPoints.filter(p=>p.type==='bridge').forEach(bp=>{
+    const px=bp.x*W2,py=bp.y*H2;
+    pvPoints.filter(p=>p.type==='prt').slice(0,3).forEach(pp=>{
+      if(!isFinite(px)||!isFinite(py)) return;
+      pvCtx.beginPath();pvCtx.moveTo(px,py);pvCtx.lineTo(pp.x*W2,pp.y*H2);
+      pvCtx.strokeStyle='rgba(192,132,252,0.08)';pvCtx.lineWidth=0.7;pvCtx.stroke();
+    });
+    pvPoints.filter(p=>p.type==='sem').slice(0,2).forEach(sp=>{
+      if(!isFinite(px)||!isFinite(py)) return;
+      pvCtx.beginPath();pvCtx.moveTo(px,py);pvCtx.lineTo(sp.x*W2,sp.y*H2);
+      pvCtx.strokeStyle='rgba(192,132,252,0.06)';pvCtx.lineWidth=0.5;pvCtx.stroke();
+    });
+  });
+
+  // SDR line — animate compression
+  const sdr=parseFloat(document.getElementById('sdr-val').textContent)||0;
+  if(sdr>0){
+    const cx=W2*0.5,cy=H2*0.5;
+    const driftX=Math.sin(pvDriftT)*W2*0.04,driftY=Math.cos(pvDriftT*0.7)*H2*0.04;
+    pvPoints.filter(p=>p.type==='prt').slice(0,sdr>0.5?6:3).forEach(pp=>{
+      pvCtx.beginPath();pvCtx.moveTo(pp.x*W2,pp.y*H2);
+      pvCtx.lineTo(cx+driftX,cy+driftY);
+      pvCtx.strokeStyle='rgba(0,229,255,0.07)';pvCtx.lineWidth=0.5;pvCtx.stroke();
+    });
+  }
+
+  // Points
+  pvPoints.forEach((p,i)=>{
+    const drift=Math.sin(pvDriftT+i*0.4)*2;
+    const dx=p.x*W2+drift,dy=p.y*H2+Math.cos(pvDriftT*0.6+i*0.3)*2;
+    if(!isFinite(dx)||!isFinite(dy)) return;
+    const col=typeCol[p.type]||'#fff';
+    const radius=typeR[p.type]||3;
+    const glow=pvCtx.createRadialGradient(dx,dy,0,dx,dy,radius*3);
+    glow.addColorStop(0,col+'55');glow.addColorStop(1,'transparent');
+    pvCtx.beginPath();pvCtx.arc(dx,dy,radius*3,0,Math.PI*2);
+    pvCtx.fillStyle=glow;pvCtx.fill();
+    pvCtx.beginPath();pvCtx.arc(dx,dy,radius,0,Math.PI*2);
+    pvCtx.fillStyle=col;pvCtx.fill();
+  });
+}
+
+// ── Sandbox canvas ────────────────────────────────
+const sbCv=document.getElementById('sb-canvas');
+const sbCtx=sbCv.getContext('2d');
+
+function drawSandbox(t3){
+  resizeCv(sbCv);
+  const W2=sbCv.width,H2=sbCv.height;
+  if(W2<2||H2<2) return;
+  sbCtx.clearRect(0,0,W2,H2);
+
+  // Phase lane labels
+  const lanes=['GENESIS\nD1','SEMIOTIC\nBRIDGE','COGNITIVE\nASSIM.'];
+  const laneW=W2/3;
+  lanes.forEach((l,i)=>{
+    sbCtx.fillStyle='rgba(255,255,255,0.03)';
+    if(i%2===0) sbCtx.fillRect(i*laneW,0,laneW,H2);
+    sbCtx.strokeStyle='rgba(255,255,255,0.05)';sbCtx.lineWidth=0.5;
+    sbCtx.beginPath();sbCtx.moveTo(i*laneW,0);sbCtx.lineTo(i*laneW,H2);sbCtx.stroke();
+    sbCtx.fillStyle='rgba(255,255,255,0.06)';sbCtx.font='7px Syne Mono';sbCtx.textAlign='center';
+    const parts=l.split('\n');
+    parts.forEach((p2,j)=>sbCtx.fillText(p2,(i+0.5)*laneW,H2-8-j*9));
+  });
+
+  // PRT particles
+  sbPRTs.forEach((p,idx)=>{
+    p.x+=p.vx*(1+(cliCeiling-p.cli)*0.5);
+    p.phase=p.x;
+
+    // Phase transitions
+    if(p.x<0.33) {p.cli=cliSmooth*0.3;}
+    else if(p.x<0.66) {p.cli=cliSmooth*0.7;}
+    else {p.cli=cliSmooth;}
+
+    // Throttle if CLI > ceiling
+    if(p.cli>cliCeiling && p.x>0.5) p.vx*=0.94;
+
+    const color = p.x<0.33?'#00e5ff' : p.x<0.66?'#c084fc' : '#fb923c';
+    const px=p.x*W2, py=p.y*H2;
+    if(!isFinite(px)||!isFinite(py)) return;
+
+    // Glow
+    const glow=sbCtx.createRadialGradient(px,py,0,px,py,14);
+    glow.addColorStop(0,color+'66');glow.addColorStop(1,'transparent');
+    sbCtx.beginPath();sbCtx.arc(px,py,14,0,Math.PI*2);
+    sbCtx.fillStyle=glow;sbCtx.fill();
+
+    // Core
+    sbCtx.beginPath();sbCtx.arc(px,py,4,0,Math.PI*2);
+    sbCtx.fillStyle=color;sbCtx.fill();
+
+    // Trail
+    sbCtx.beginPath();sbCtx.moveTo(px,py);
+    sbCtx.lineTo(Math.max(0,px-30),py);
+    const trail=sbCtx.createLinearGradient(Math.max(0,px-30),py,px,py);
+    trail.addColorStop(0,'transparent');trail.addColorStop(1,color+'55');
+    sbCtx.strokeStyle=trail;sbCtx.lineWidth=1.5;sbCtx.stroke();
+
+    // CLI indicator
+    if(p.cli>cliCeiling*0.9){
+      sbCtx.beginPath();sbCtx.arc(px,py,7,0,Math.PI*2);
+      sbCtx.strokeStyle='rgba(248,113,113,0.6)';sbCtx.lineWidth=1;sbCtx.stroke();
+    }
+
+    if(p.x>1.02) sbPRTs.splice(idx,1);
+  });
+
+  // KPI bars at right edge
+  sbCtx.font='7px Syne Mono';sbCtx.textAlign='left';
+  const metrics=[{label:'AV',val:aVel,col:'#4ade80'},{label:'SE',val:sExp,col:'#c084fc'},{label:'BH',val:biHom,col:'#fb923c'}];
+  metrics.forEach((m,i)=>{
+    const bx=W2*0.68,by=8+i*16,bw=W2*0.28,bh=6;
+    sbCtx.fillStyle='rgba(255,255,255,0.06)';sbCtx.fillRect(bx,by,bw,bh);
+    sbCtx.fillStyle=m.col;sbCtx.fillRect(bx,by,bw*clamp(m.val,0,1),bh);
+    sbCtx.fillStyle='rgba(255,255,255,0.3)';sbCtx.fillText(m.label,bx+bw+4,by+6);
+  });
+}
+
+// ── Sparkline helper ──────────────────────────────
+function drawSpark(cv,buf,col,min,max){
+  const W2=cv.offsetWidth,H2=cv.offsetHeight;
+  if(cv.width!==W2||cv.height!==H2){cv.width=W2;cv.height=H2;}
+  if(W2<2||H2<2) return;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,W2,H2);
+  const range=max-min;
+  ctx.beginPath();ctx.strokeStyle=col;ctx.lineWidth=1.4;
+  buf.forEach((v,i)=>{
+    const x=i/(buf.length-1)*W2,y=H2-((clamp(v,min,max)-min)/range*(H2-2))-1;
+    if(!isFinite(x)||!isFinite(y)) return;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+}
+
+// ── Main tick ─────────────────────────────────────
+function tick(){
+  requestAnimationFrame(tick);
+  const now=performance.now();
+  const dt=Math.min((now-prevNow)/1000,0.05);
+  prevNow=now; t+=dt;
+
+  // ── Load oscillator ──
+  loadChangeT-=dt;
+  if(loadChangeT<=0){loadTarget=rnd(0.12,0.78);loadChangeT=rnd(8,16);}
+  cogLoad=lerp(cogLoad,loadTarget,dt*0.3);
+  noveltyTarget=rnd(0.55,0.98);
+  noveltySmooth=lerp(noveltySmooth,noveltyTarget,dt*0.8);
+
+  // ── D1 ──────────────────────────────────────────
+  const icvpPct=Math.round(clamp(56+noveltySmooth*40,56,100));
+  D1_H.copyWithin(0,1);D1_H[119]=noveltySmooth;
+  updateD1(noveltySmooth,icvpPct);
+
+  // ── D2 ──────────────────────────────────────────
+  d2p=clamp(2+Math.round(cogLoad*2+purity*1),2,6);
+  d2q=clamp(3+Math.round(noveltySmooth*4+purity),3,9);
+  d2f=parseFloat(clamp(0.35+cogLoad*1.5,0.2,4).toFixed(2));
+  d2g=clamp(Math.round(cogLoad*2),0,3);
+  d2W=parseFloat((cogLoad*0.8-0.4).toFixed(3));
+  d2K=parseFloat((cogLoad*3.5+0.5).toFixed(2));
+  d2pS=lerp(d2pS,d2p,dt*2);d2qS=lerp(d2qS,d2q,dt*2);
+  D2_H.copyWithin(0,1);D2_H[119]=noveltySmooth*0.5+cogLoad*0.5;
+  drawHopfion2D(d2pS,d2qS,t,d2W);
+  updateD2();
+
+  // ── CLI ──────────────────────────────────────────
+  tepr=clamp((cogLoad-0.35)*1.8,-.5,1.5);
+  const rmssd=clamp(50-cogLoad*25,10,60);
+  hrvs=clamp(1-rmssd/48,-0.3,1.2);
+  const z=0.6*tepr+0.4*hrvs-0.5;
+  cliSmooth=lerp(cliSmooth,sigmoid(z),dt*2);
+  CLI_H.copyWithin(0,1);CLI_H[179]=cliSmooth;
+  updateD3(cliSmooth);
+
+  // ── Tensions ─────────────────────────────────────
+  const t1=clamp(noveltySmooth*0.6+(1-purity)*0.4,0,1); // Novelty vs familiarity
+  const t2=clamp(cliSmooth/cliCeiling,0,1);              // Integrity vs dilution
+  document.getElementById('t1-fill').style.width=(t1*100)+'%';
+  document.getElementById('t1-val').textContent=t1.toFixed(3);
+  document.getElementById('t2-fill').style.width=(t2*100)+'%';
+  document.getElementById('t2-val').textContent=t2.toFixed(3);
+  document.getElementById('tension-badge').style.display=(t1>0.6||t2>0.8)?'':'none';
+
+  // ── SDR / Middleware ──────────────────────────────
+  const sdr=clamp((1-purity)*0.7+cliSmooth*0.3,0,1);
+  const structLoss=clamp(sdr*(1-purity*0.6),0,1);
+  const calibR=(purity*(1-cliSmooth/cliCeiling)).toFixed(3);
+  document.getElementById('sdr-val').textContent=(sdr*100).toFixed(1)+'%';
+  document.getElementById('struct-loss').textContent=(structLoss*100).toFixed(1)+'%';
+  document.getElementById('calib-ratio').textContent=calibR;
+  document.getElementById('sdr-hdr').textContent=(sdr*100).toFixed(1)+'%';
+  document.getElementById('cli-hdr').textContent=cliSmooth.toFixed(3);
+  document.getElementById('calib-hdr').textContent=calibR;
+
+  // ── Sandbox metrics ───────────────────────────────
+  aVel=clamp(lerp(aVel,cliCeiling*(1-cliSmooth/cliCeiling)*0.9,dt*0.5),0,1);
+  sExp=clamp(lerp(sExp,purity*0.85*(1-sdr*0.4),dt*0.3),0,1);
+  biHom=clamp(lerp(biHom,1-Math.max(0,cliSmooth-cliCeiling)*3,dt*0.8),0,1);
+  document.getElementById('ab-av').style.width=(aVel*100)+'%';
+  document.getElementById('av-val').textContent=aVel.toFixed(2);
+  document.getElementById('ab-se').style.width=(sExp*100)+'%';
+  document.getElementById('se-val').textContent=sExp.toFixed(2);
+  document.getElementById('ab-bh').style.width=(biHom*100)+'%';
+  document.getElementById('bh-val').textContent=biHom.toFixed(2);
+
+  // ── Draw flows ────────────────────────────────────
+  drawFlowConnector(cvF12,'#00e5ff','#c084fc',[],t);
+  drawFlowConnector(cvF23,'#c084fc','#fb923c',[],t);
+  drawPVScatter(t);
+  drawSandbox(t);
+  drawSpark(document.getElementById('cv-d1-spark'),D1_H,'#00e5ff',0,1);
+  drawSpark(document.getElementById('cv-d2-spark'),D2_H,'#c084fc',0,1);
+  drawSpark(document.getElementById('cv-d3-cli'),CLI_H,'#fb923c',0,1);
+}
+
+function updateD1(novelty,icvp){
+  document.getElementById('d1-novelty').textContent=novelty.toFixed(4);
+  document.getElementById('d1-consensus').textContent=icvp+'%';
+  document.getElementById('d1-consensus').style.color=icvp>=67?'#4ade80':'#f87171';
+  document.getElementById('d1-topo').textContent=`T(${d2p},${d2q}) · β₀=${clamp(Math.round(1+cogLoad),1,3)} · Q=${d2p*d2q}`;
+  // Node colors
+  for(let i=0;i<24;i++){
+    const el=document.getElementById('nd-'+i);
+    if(!el) continue;
+    const h=((i*37+11)%24)/24;
+    if(h<novelty*0.65){el.style.background='#00e5ff';el.style.boxShadow='0 0 6px #00e5ff88';}
+    else if(h<novelty*0.85){el.style.background='rgba(0,229,255,0.35)';el.style.boxShadow='none';}
+    else{el.style.background='rgba(0,229,255,0.07)';el.style.boxShadow='none';}
+  }
+  // ICVP commit timer
+  commitTimer+=0.016;
+  if(commitTimer>rnd(6,12)&&icvp>=67){
+    commitTimer=0;icvpCommits++;
+    document.getElementById('commits-hdr').textContent=icvpCommits;
+  }
+}
+
+function updateD2(){
+  document.getElementById('d2-b0').textContent=clamp(Math.round(1+cogLoad),1,3);
+  document.getElementById('d2-b1').textContent=clamp(Math.round(cogLoad*3),0,4);
+  document.getElementById('d2-k').textContent=d2K.toFixed(1);
+  document.getElementById('d2-w').textContent=d2W.toFixed(2);
+  document.getElementById('d2-freq').textContent='f='+d2f+'Hz';
+  document.getElementById('d2-genus').textContent='g='+d2g;
+}
+
+function updateD3(cli){
+  document.getElementById('d3-cli').textContent=cli.toFixed(4);
+  const states=['LOW LOAD — flow state active','MODERATE — learning optimal','HIGH LOAD — approaching threshold','CRITICAL — CLI ceiling breach'];
+  const si=cli<0.3?0:cli<0.55?1:cli<cliCeiling?2:3;
+  const cols=['#4ade80','#fb923c','#fb923c','#f87171'];
+  document.getElementById('d3-state').textContent=states[si];
+  document.getElementById('d3-cli').style.color=cols[si];
+  // Prime chips
+  const hotN=Math.round(cli*22+3);
+  NSM_PRIMES.forEach((_,i)=>{
+    const el=document.getElementById('prc-'+i);
+    if(!el) return;
+    const h=((i*37+11)%65)/65;
+    if(h<cli*0.55){el.className='prime-chip pc-hot';}
+    else if(h<cli*0.80){el.className='prime-chip pc-warm';}
+    else{el.className='prime-chip pc-off';}
+  });
+}
+
+tick();
+</script>
+</body>
+</html>

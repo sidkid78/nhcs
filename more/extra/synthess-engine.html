@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autonomous Conceptual Synthesis Engine</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+        :root {
+            --bg: #020408;
+            --bg2: #050c12;
+            --panel: rgba(5, 14, 20, 0.88);
+            --border: rgba(0, 220, 255, 0.18);
+            --border-bright: rgba(0, 220, 255, 0.5);
+            --cyan: #00dcff;
+            --cyan-dim: rgba(0, 220, 255, 0.6);
+            --purple: #9b5de5;
+            --green: #00ff9f;
+            --amber: #ffb300;
+            --red: #ff4444;
+            --text: #c8e8f0;
+            --text-dim: rgba(200, 232, 240, 0.45);
+            --mono: 'Share Tech Mono', monospace;
+            --display: 'Orbitron', monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 11px;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* Noise overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+            pointer-events: none;
+        }
+
+        #app {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            grid-template-rows: 40px 1fr;
+            height: 100vh;
+            gap: 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ── Header ── */
+        #header {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 18px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(0, 5, 10, 0.9);
+        }
+
+        #header h1 {
+            font-family: var(--display);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            color: var(--cyan);
+            text-shadow: 0 0 18px rgba(0, 220, 255, 0.5);
+        }
+
+        .status-strip {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .status-dot {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 9px;
+            letter-spacing: 1px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+            animation: pulse-dot 1.8s ease-in-out infinite;
+        }
+
+        .dot.amber {
+            background: var(--amber);
+            box-shadow: 0 0 8px var(--amber);
+        }
+
+        @keyframes pulse-dot {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.35;
+            }
+        }
+
+        /* ── Canvas area ── */
+        #canvas-wrap {
+            position: relative;
+            background: radial-gradient(ellipse at 40% 50%, rgba(0, 30, 50, 0.6) 0%, var(--bg) 70%);
+            overflow: hidden;
+        }
+
+        #canvas-wrap canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #canvas-label {
+            position: absolute;
+            bottom: 10px;
+            left: 14px;
+            font-size: 9px;
+            letter-spacing: 2px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        .op-flash {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: var(--display);
+            font-size: 10px;
+            letter-spacing: 2px;
+            padding: 4px 14px;
+            border-radius: 2px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .op-flash.show {
+            opacity: 1;
+        }
+
+        .op-flash.sym {
+            color: var(--cyan);
+            border-color: var(--cyan);
+            text-shadow: 0 0 10px var(--cyan);
+        }
+
+        .op-flash.syn {
+            color: var(--green);
+            border-color: var(--green);
+            text-shadow: 0 0 10px var(--green);
+        }
+
+        .op-flash.smo {
+            color: var(--purple);
+            border-color: var(--purple);
+            text-shadow: 0 0 10px var(--purple);
+        }
+
+        /* ── Right panel ── */
+        #right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            border-left: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .panel {
+            border-bottom: 1px solid var(--border);
+            background: var(--panel);
+            flex-shrink: 0;
+        }
+
+        .panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 7px 12px;
+            background: rgba(0, 220, 255, 0.04);
+            border-bottom: 1px solid var(--border);
+            font-family: var(--display);
+            font-size: 8px;
+            letter-spacing: 2px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--cyan);
+        }
+
+        .panel-head span {
+            font-family: var(--mono);
+            font-size: 9px;
+            color: var(--text-dim);
+            letter-spacing: 0;
+            font-weight: 400;
+        }
+
+        /* ── Metrics panel ── */
+        #metrics-panel {
+            padding-bottom: 6px;
+        }
+
+        .metric-row {
+            display: flex;
+            align-items: center;
+            padding: 5px 12px;
+            gap: 8px;
+        }
+
+        .metric-label {
+            width: 110px;
+            flex-shrink: 0;
+            font-size: 9px;
+            color: var(--text-dim);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .metric-bar-wrap {
+            flex: 1;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .metric-bar {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.6s ease;
+        }
+
+        .bar-cyan {
+            background: linear-gradient(90deg, rgba(0, 150, 200, 0.5), var(--cyan));
+            box-shadow: 0 0 6px rgba(0, 220, 255, 0.4);
+        }
+
+        .bar-green {
+            background: linear-gradient(90deg, rgba(0, 150, 80, 0.5), var(--green));
+            box-shadow: 0 0 6px rgba(0, 255, 159, 0.4);
+        }
+
+        .bar-amber {
+            background: linear-gradient(90deg, rgba(180, 100, 0, 0.5), var(--amber));
+            box-shadow: 0 0 6px rgba(255, 179, 0, 0.4);
+        }
+
+        .bar-purple {
+            background: linear-gradient(90deg, rgba(80, 30, 150, 0.5), var(--purple));
+            box-shadow: 0 0 6px rgba(155, 93, 229, 0.4);
+        }
+
+        .bar-red {
+            background: linear-gradient(90deg, rgba(180, 30, 30, 0.5), var(--red));
+        }
+
+        .metric-val {
+            width: 36px;
+            text-align: right;
+            font-size: 10px;
+            color: var(--text);
+        }
+
+        .metric-val.good {
+            color: var(--green);
+        }
+
+        .metric-val.warn {
+            color: var(--amber);
+        }
+
+        /* ── ICVP panel ── */
+        #icvp-panel {}
+
+        .agents-row {
+            display: flex;
+            padding: 8px 10px;
+            gap: 6px;
+        }
+
+        .agent-card {
+            flex: 1;
+            padding: 6px 8px;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            background: rgba(0, 0, 0, 0.3);
+            transition: border-color 0.3s;
+        }
+
+        .agent-card.active {
+            border-color: var(--green);
+            box-shadow: 0 0 10px rgba(0, 255, 159, 0.15);
+        }
+
+        .agent-card.reject {
+            border-color: var(--red);
+        }
+
+        .agent-name {
+            font-family: var(--display);
+            font-size: 8px;
+            letter-spacing: 1px;
+            color: var(--cyan);
+            margin-bottom: 4px;
+        }
+
+        .agent-state {
+            font-size: 9px;
+            color: var(--text-dim);
+            min-height: 28px;
+            line-height: 1.5;
+        }
+
+        .agent-vote {
+            margin-top: 4px;
+            font-size: 9px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .vote-accept {
+            color: var(--green);
+        }
+
+        .vote-reject {
+            color: var(--red);
+        }
+
+        .vote-eval {
+            color: var(--amber);
+            animation: blink 0.6s ease infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: 0.3
+            }
+        }
+
+        .consensus-row {
+            padding: 5px 12px 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .con-label {
+            font-size: 9px;
+            color: var(--text-dim);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            width: 80px;
+        }
+
+        .con-bar-wrap {
+            flex: 1;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .con-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.8s ease;
+            background: linear-gradient(90deg, var(--green), rgba(0, 220, 255, 0.8));
+        }
+
+        .con-threshold {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 66%;
+            width: 1px;
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .con-pct {
+            font-size: 10px;
+            color: var(--green);
+            width: 34px;
+            text-align: right;
+        }
+
+        .current-proposal {
+            padding: 5px 12px 8px;
+            font-size: 9px;
+        }
+
+        .proposal-label {
+            color: var(--text-dim);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 3px;
+        }
+
+        .proposal-concept {
+            color: var(--cyan);
+            font-size: 10px;
+            background: rgba(0, 220, 255, 0.05);
+            border: 1px solid var(--border);
+            padding: 4px 8px;
+            border-radius: 2px;
+            word-break: break-all;
+            line-height: 1.5;
+        }
+
+        /* ── Ledger ── */
+        #ledger-panel {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #ledger-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 4px 0;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent;
+        }
+
+        .ledger-item {
+            padding: 5px 12px;
+            border-bottom: 1px solid rgba(0, 220, 255, 0.06);
+            animation: fadeIn 0.5s ease;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 4px;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-6px);
+            }
+
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        .ledger-concept {
+            font-size: 9px;
+            color: var(--cyan);
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .ledger-meta {
+            font-size: 8px;
+            color: var(--text-dim);
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 8px;
+        }
+
+        .ledger-score {
+            white-space: nowrap;
+        }
+
+        .score-good {
+            color: var(--green);
+        }
+
+        .score-ok {
+            color: var(--amber);
+        }
+
+        .ledger-seq {
+            color: var(--purple);
+            font-size: 8px;
+            text-align: right;
+        }
+
+        /* ── Topo display (bottom of canvas) ── */
+        #topo-bar {
+            position: absolute;
+            top: 10px;
+            right: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 9px;
+            color: var(--text-dim);
+            background: rgba(2, 4, 8, 0.75);
+            border: 1px solid var(--border);
+            padding: 8px 10px;
+            border-radius: 3px;
+            backdrop-filter: blur(4px);
+            min-width: 140px;
+        }
+
+        .topo-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .topo-key {
+            color: var(--text-dim);
+        }
+
+        .topo-val {
+            color: var(--cyan);
+        }
+
+        /* ── Scanlines ── */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.015) 2px, rgba(0, 0, 0, 0.015) 4px);
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <header id="header">
+            <h1>AUTONOMOUS CONCEPTUAL SYNTHESIS ENGINE</h1>
+            <div class="status-strip">
+                <div class="status-dot">
+                    <div class="dot"></div> PRT ACTIVE
+                </div>
+                <div class="status-dot">
+                    <div class="dot amber"></div> ICVP ONLINE
+                </div>
+                <div class="status-dot" id="cycle-counter">CYCLE: 0</div>
+            </div>
+        </header>
+
+        <div id="canvas-wrap">
+            <canvas id="graph-canvas"></canvas>
+            <div class="op-flash" id="op-flash"></div>
+            <div id="topo-bar">
+                <div
+                    style="font-family:var(--display);font-size:8px;color:var(--cyan);letter-spacing:2px;margin-bottom:4px">
+                    TOPOLOGY</div>
+                <div class="topo-row"><span class="topo-key">β₀ (components)</span><span class="topo-val"
+                        id="b0">—</span></div>
+                <div class="topo-row"><span class="topo-key">β₁ (cycles)</span><span class="topo-val" id="b1">—</span>
+                </div>
+                <div class="topo-row"><span class="topo-key">E-Nodes</span><span class="topo-val" id="node-ct">—</span>
+                </div>
+                <div class="topo-row"><span class="topo-key">Relations</span><span class="topo-val"
+                        id="edge-ct">—</span></div>
+                <div class="topo-row"><span class="topo-key">QH (tangling)</span><span class="topo-val"
+                        id="qh-val">—</span></div>
+            </div>
+            <div id="canvas-label">SEMANTIC HYPERGRAPH — RELATIONAL SPACE Ω</div>
+        </div>
+
+        <div id="right-panel">
+            <!-- Metrics -->
+            <div class="panel" id="metrics-panel">
+                <div class="panel-head">
+                    MERIT HEURISTICS
+                    <span id="aha-flash"></span>
+                </div>
+                <div class="metric-row">
+                    <div class="metric-label">MDL Compression</div>
+                    <div class="metric-bar-wrap">
+                        <div class="metric-bar bar-cyan" id="bar-mdl"></div>
+                    </div>
+                    <div class="metric-val" id="val-mdl">—</div>
+                </div>
+                <div class="metric-row">
+                    <div class="metric-label">Aesthetic Δ</div>
+                    <div class="metric-bar-wrap">
+                        <div class="metric-bar bar-green" id="bar-aes"></div>
+                    </div>
+                    <div class="metric-val good" id="val-aes">—</div>
+                </div>
+                <div class="metric-row">
+                    <div class="metric-label">Pred. Entropy</div>
+                    <div class="metric-bar-wrap">
+                        <div class="metric-bar bar-amber" id="bar-ent"></div>
+                    </div>
+                    <div class="metric-val warn" id="val-ent">—</div>
+                </div>
+                <div class="metric-row">
+                    <div class="metric-label">Scale Invar.</div>
+                    <div class="metric-bar-wrap">
+                        <div class="metric-bar bar-purple" id="bar-scale"></div>
+                    </div>
+                    <div class="metric-val" id="val-scale">—</div>
+                </div>
+                <div class="metric-row">
+                    <div class="metric-label">Edge of Chaos</div>
+                    <div class="metric-bar-wrap">
+                        <div class="metric-bar bar-red" id="bar-chaos"></div>
+                    </div>
+                    <div class="metric-val" id="val-chaos">—</div>
+                </div>
+            </div>
+
+            <!-- ICVP -->
+            <div class="panel" id="icvp-panel">
+                <div class="panel-head">
+                    ICVP — INTERSUBJECTIVE VALIDATION
+                    <span id="icvp-phase">IDLE</span>
+                </div>
+                <div class="current-proposal">
+                    <div class="proposal-label">Current Proposal</div>
+                    <div class="proposal-concept" id="proposal-text">Awaiting synthesis event…</div>
+                </div>
+                <div class="agents-row">
+                    <div class="agent-card" id="agent-0">
+                        <div class="agent-name">NODE-Ω</div>
+                        <div class="agent-state" id="a0-state">Monitoring hypergraph…</div>
+                        <div class="agent-vote" id="a0-vote"></div>
+                    </div>
+                    <div class="agent-card" id="agent-1">
+                        <div class="agent-name">NODE-Δ</div>
+                        <div class="agent-state" id="a1-state">Sampling manifold…</div>
+                        <div class="agent-vote" id="a1-vote"></div>
+                    </div>
+                    <div class="agent-card" id="agent-2">
+                        <div class="agent-name">NODE-Σ</div>
+                        <div class="agent-state" id="a2-state">Idle. Listening.</div>
+                        <div class="agent-vote" id="a2-vote"></div>
+                    </div>
+                </div>
+                <div class="consensus-row">
+                    <div class="con-label">Consensus</div>
+                    <div class="con-bar-wrap">
+                        <div class="con-bar" id="con-bar" style="width:0%"></div>
+                        <div class="con-threshold"></div>
+                    </div>
+                    <div class="con-pct" id="con-pct">0%</div>
+                </div>
+            </div>
+
+            <!-- Global Ledger -->
+            <div class="panel" id="ledger-panel">
+                <div class="panel-head">
+                    GLOBAL KNOWLEDGE LEDGER
+                    <span id="ledger-count">0 concepts</span>
+                </div>
+                <div id="ledger-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ═══════════════════════════════════════════════════════════
+        //  PURE RELATIONAL TOPOLOGY  — Simulation Core
+        // ═══════════════════════════════════════════════════════════
+
+        const canvas = document.getElementById('graph-canvas');
+        const ctx = canvas.getContext('2d');
+        const wrap = document.getElementById('canvas-wrap');
+
+        let W, H;
+        function resize() {
+            W = wrap.offsetWidth; H = wrap.offsetHeight;
+            canvas.width = W; canvas.height = H;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        // ── Node / Edge structures ──
+        let nodes = [], edges = [], cycle = 0;
+        let ledger = [], ledgerSeq = 0;
+
+        // Concept vocabulary atoms for synthesis naming
+        const ATOMS_P = ['asymmetric', 'entropic', 'recursive', 'non-Euclidean', 'orthogonal', 'topological', 'manifold', 'spectral', 'recursive', 'bifurcated'];
+        const ATOMS_N = ['morphism', 'relatum', 'invariant', 'cohomology', 'pushout', 'functor', 'genus', 'attractor', 'eigenvector', 'preimage'];
+        const PREFIXES = ['Φ', 'Ψ', 'Λ', 'Ξ', 'Ω', 'Δ', 'Θ', 'Γ', 'Σ', '∇'];
+        const GREEK = ['α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ'];
+
+        function rnd(a, b) { return a + Math.random() * (b - a); }
+        function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+        function conceptName(p, q) {
+            const pr = PREFIXES[Math.floor(Math.random() * 10)];
+            const gr = GREEK[Math.floor(Math.random() * 10)];
+            const hex = Math.floor(Math.random() * 256).toString(16).padStart(2, '0').toUpperCase();
+            return `${pr}[${p},${q}]-${pick(ATOMS_P)} ${pick(ATOMS_N)}.${gr}${hex}`;
+        }
+
+        // ── Initialize E-Nodes ──
+        function initNodes(n = 22) {
+            nodes = [];
+            edges = [];
+            for (let i = 0; i < n; i++) {
+                nodes.push({
+                    id: i, x: rnd(80, W - 80), y: rnd(60, H - 60),
+                    vx: 0, vy: 0, r: rnd(4, 9),
+                    flux: rnd(0.3, 1), age: 0,
+                    type: Math.floor(Math.random() * 4), // 0=primitive 1=synthesized 2=smoothed 3=anchor
+                    hue: rnd(160, 220), pulse: Math.random() * Math.PI * 2,
+                    label: `E${i.toString(16).toUpperCase()}`,
+                });
+            }
+            // Establish initial relational distinctions (symmetry breaking)
+            const edgeCount = Math.floor(n * 1.4);
+            for (let i = 0; i < edgeCount; i++) {
+                const a = Math.floor(Math.random() * n);
+                let b = Math.floor(Math.random() * n);
+                if (b === a) b = (b + 1) % n;
+                if (!edgeExists(a, b)) {
+                    edges.push({ a, b, w: rnd(0.2, 1), age: 0, type: 0, color: `hsl(${rnd(170, 230)},80%,55%)` });
+                }
+            }
+        }
+
+        function edgeExists(a, b) {
+            return edges.some(e => (e.a === a && e.b === b) || (e.a === b && e.b === a));
+        }
+
+        // ── Force-directed layout (spring physics) ──
+        function safeNum(v, fallback = 0) {
+            return isFinite(v) ? v : fallback;
+        }
+        function sanitizeNode(n) {
+            if (!isFinite(n.x) || !isFinite(n.y)) {
+                n.x = rnd(80, W - 80); n.y = rnd(60, H - 60);
+            }
+            if (!isFinite(n.vx)) n.vx = 0;
+            if (!isFinite(n.vy)) n.vy = 0;
+        }
+
+        function applyForces() {
+            const REPEL = 1800, ATTRACT = 0.012, DAMP = 0.88;
+            for (let i = 0; i < nodes.length; i++) {
+                const ni = nodes[i];
+                sanitizeNode(ni);
+                for (let j = i + 1; j < nodes.length; j++) {
+                    const nj = nodes[j];
+                    sanitizeNode(nj);
+                    const dx = nj.x - ni.x, dy = nj.y - ni.y;
+                    const d2 = dx * dx + dy * dy + 1;
+                    const f = REPEL / d2;
+                    ni.vx -= dx * f; ni.vy -= dy * f;
+                    nj.vx += dx * f; nj.vy += dy * f;
+                }
+                ni.vx += (W / 2 - ni.x) * 0.0008;
+                ni.vy += (H / 2 - ni.y) * 0.0008;
+                ni.vx = safeNum(ni.vx * DAMP);
+                ni.vy = safeNum(ni.vy * DAMP);
+                // Clamp velocity to prevent runaway
+                const spd = Math.sqrt(ni.vx * ni.vx + ni.vy * ni.vy);
+                if (spd > 12) { ni.vx = ni.vx / spd * 12; ni.vy = ni.vy / spd * 12; }
+                ni.x = Math.max(30, Math.min(W - 30, ni.x + ni.vx));
+                ni.y = Math.max(30, Math.min(H - 30, ni.y + ni.vy));
+                ni.pulse += 0.03;
+                ni.age++;
+            }
+            for (const e of edges) {
+                const ni = nodes[e.a], nj = nodes[e.b];
+                if (!ni || !nj) continue;
+                sanitizeNode(ni); sanitizeNode(nj);
+                const dx = nj.x - ni.x, dy = nj.y - ni.y;
+                const d = Math.sqrt(dx * dx + dy * dy);
+                if (d < 0.001) continue; // skip degenerate edges
+                const rest = 90;
+                const f = (d - rest) * ATTRACT;
+                ni.vx = safeNum(ni.vx + dx * f / d);
+                ni.vy = safeNum(ni.vy + dy * f / d);
+                nj.vx = safeNum(nj.vx - dx * f / d);
+                nj.vy = safeNum(nj.vy - dy * f / d);
+                e.age++;
+            }
+        }
+
+        // ── Topology computation ──
+        function computeTopology() {
+            const n = nodes.length, m = edges.filter(e => nodes[e.a] && nodes[e.b]).length;
+            // Union-Find for β₀
+            const parent = nodes.map((_, i) => i);
+            function find(x) { return parent[x] === x ? x : (parent[x] = find(parent[x])); }
+            function union(x, y) { parent[find(x)] = find(y); }
+            for (const e of edges) { if (nodes[e.a] && nodes[e.b]) union(e.a, e.b); }
+            const b0 = new Set(nodes.map((_, i) => find(i))).size;
+            const b1 = Math.max(0, m - n + b0); // Euler: V - E + F = χ = β₀ - β₁
+            return { b0, b1, n, m };
+        }
+
+        // ── MDL & merit metrics ──
+        let prevCompression = 0.5, schmiComp = 0;
+        function computeMetrics(topo) {
+            const { n, m, b0, b1 } = topo;
+            const density = n > 0 ? m / (n * (n - 1) / 2 + 0.001) : 0;
+            const mdl = Math.min(1, 0.3 + density * 0.5 + (1 / n) * 2); // higher density = better compression
+            const entropy = Math.max(0.05, 0.9 - density * 0.6 + b0 * 0.04);
+            const scaleInv = 0.4 + Math.abs(Math.sin(cycle * 0.07)) * 0.45;
+            const edgeOfChaos = Math.max(0, 1 - Math.abs(density - 0.38) * 3);
+            // Schmidhuber: derivative of compression
+            const deltaComp = mdl - prevCompression;
+            schmiComp = Math.max(0, Math.min(1, schmiComp * 0.92 + Math.max(0, deltaComp) * 8));
+            prevCompression = mdl;
+            return { mdl, entropy, scaleInv, edgeOfChaos, aesthetic: schmiComp };
+        }
+
+        function setBar(id, val, valId, suffix = '') {
+            const bar = document.getElementById(id);
+            const lbl = document.getElementById(valId);
+            if (bar) bar.style.width = (val * 100).toFixed(1) + '%';
+            if (lbl) lbl.textContent = (val * 100).toFixed(0) + (suffix || '%');
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  OPERATIONS
+        // ═══════════════════════════════════════════════════════════
+        function flashOp(text, cls) {
+            const el = document.getElementById('op-flash');
+            el.textContent = text; el.className = 'op-flash show ' + cls;
+            setTimeout(() => { el.className = 'op-flash'; }, 1800);
+        }
+
+        // 1. Symmetry Breaking: add new RD between weakly-connected nodes
+        function symmetryBreak() {
+            const n = nodes.length;
+            if (n < 2) return;
+            // Pick pair with no edge and low flux
+            let best = null, bestDist = 0;
+            for (let t = 0; t < 30; t++) {
+                const a = Math.floor(Math.random() * n), b = Math.floor(Math.random() * n);
+                if (a === b || edgeExists(a, b)) continue;
+                const dx = nodes[a].x - nodes[b].x, dy = nodes[a].y - nodes[b].y;
+                const d = Math.sqrt(dx * dx + dy * dy);
+                if (d > bestDist) { bestDist = d; best = [a, b]; }
+            }
+            if (best) {
+                edges.push({
+                    a: best[0], b: best[1], w: rnd(0.1, 0.5), age: 0, type: 0,
+                    color: `hsl(${rnd(180, 210)},70%,50%)`, fresh: true
+                });
+                nodes[best[0]].flux += 0.1; nodes[best[1]].flux += 0.1;
+                flashOp('SYMMETRY BREAKING', 'sym');
+            }
+        }
+
+        // 2. Conceptual Synthesis: merge two distant nodes → new synthesized node
+        function conceptSynthesis() {
+            if (nodes.length < 4) return;
+            // Find two nodes far apart with some connectivity
+            let bestA = 0, bestB = 1, bestScore = -1;
+            for (let t = 0; t < 50; t++) {
+                const a = Math.floor(Math.random() * nodes.length);
+                const b = Math.floor(Math.random() * nodes.length);
+                if (a === b) continue;
+                const dx = nodes[a].x - nodes[b].x, dy = nodes[a].y - nodes[b].y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const score = dist * (nodes[a].flux + nodes[b].flux);
+                if (score > bestScore) { bestScore = score; bestA = a; bestB = b; }
+            }
+            // New synthesized node at midpoint
+            const na = nodes[bestA], nb = nodes[bestB];
+            const newNode = {
+                id: nodes.length, x: (na.x + nb.x) / 2 + rnd(-20, 20), y: (na.y + nb.y) / 2 + rnd(-20, 20),
+                vx: 0, vy: 0, r: rnd(6, 11), flux: (na.flux + nb.flux) * 0.7, age: 0,
+                type: 1, hue: rnd(100, 160), pulse: Math.random() * Math.PI * 2,
+                label: `S${ledgerSeq.toString(16).toUpperCase()}`,
+            };
+            nodes.push(newNode);
+            // Connect new node to both parents + some others
+            edges.push({ a: bestA, b: newNode.id, w: 0.9, age: 0, type: 1, color: '#00ff9f', fresh: true });
+            edges.push({ a: bestB, b: newNode.id, w: 0.9, age: 0, type: 1, color: '#00ff9f', fresh: true });
+            for (let t = 0; t < 3; t++) {
+                const other = Math.floor(Math.random() * nodes.length);
+                if (other !== newNode.id && !edgeExists(other, newNode.id)) {
+                    edges.push({ a: other, b: newNode.id, w: rnd(0.3, 0.7), age: 0, type: 1, color: '#4488ff', fresh: true });
+                }
+            }
+            na.flux *= 0.7; nb.flux *= 0.7;
+            flashOp('CATEGORICAL PUSHOUT → NEW PRIMITIVE', 'syn');
+            triggerICVP(newNode, bestA, bestB);
+        }
+
+        // 3. Manifold Smoothing: prune low-flux nodes
+        function manifoldSmooth() {
+            const threshold = 0.18;
+            const toRemove = nodes.filter(n => n.type !== 3 && n.flux < threshold && n.age > 120);
+            if (toRemove.length === 0) {
+                // Age down oldest nodes
+                const oldest = nodes.filter(n => n.type !== 3).sort((a, b) => b.age - a.age);
+                if (oldest[0]) { oldest[0].flux *= 0.4; }
+                return;
+            }
+            const removeId = new Set(toRemove.slice(0, 1).map(n => n.id));
+            // Remove edges referencing removed nodes
+            edges = edges.filter(e => !removeId.has(e.a) && !removeId.has(e.b));
+            nodes = nodes.filter(n => !removeId.has(n.id));
+            // Re-index
+            const idMap = {};
+            nodes.forEach((n, i) => { idMap[n.id] = i; n.id = i; });
+            edges.forEach(e => { e.a = idMap[e.a] ?? e.a; e.b = idMap[e.b] ?? e.b; });
+            flashOp('MANIFOLD SMOOTHING — β REDUCED', 'smo');
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  ICVP — Intersubjective Concept Valuation Protocol
+        // ═══════════════════════════════════════════════════════════
+        let icvpActive = false;
+        let icvpTimeout = null;
+
+        const agentMessages = {
+            eval: [
+                ['Ingesting into sandbox…', 'Testing coherence…', 'Sampling…'],
+                ['Parsing relational dist.', 'MDL scoring…', 'Assessing genus…'],
+                ['Running entropy probe…', 'Stability check…', 'Evaluating flux…'],
+            ],
+            accept: [
+                'Coherence: PASS. High parsimony detected.',
+                'Generativity confirmed. Information density: ↑',
+                'Structural stability VERIFIED. PoU: positive.',
+            ],
+            reject: [
+                'REJECT — cosine sim to archetype > 0.7',
+                'REJECT — topological tear detected.',
+                'REJECT — entropy too high. Incoherent.',
+            ],
+        };
+
+        function triggerICVP(newNode, parentA, parentB) {
+            if (icvpActive) return;
+            icvpActive = true;
+            const topo = computeTopology();
+            const concept = conceptName(topo.b0, topo.b1);
+            const mdlScore = rnd(0.55, 0.98);
+            const aesScore = rnd(0.40, 0.90);
+
+            document.getElementById('proposal-text').textContent = concept;
+            document.getElementById('icvp-phase').textContent = 'EVALUATION';
+
+            // Reset agents
+            [0, 1, 2].forEach(i => {
+                const card = document.getElementById(`agent-${i}`);
+                card.className = 'agent-card';
+                document.getElementById(`a${i}-vote`).textContent = '';
+                document.getElementById(`a${i}-vote`).className = 'agent-vote';
+            });
+            document.getElementById('con-bar').style.width = '0%';
+            document.getElementById('con-pct').textContent = '0%';
+
+            let votes = [null, null, null];
+            const delays = [900, 1600, 2300];
+
+            const evaluateAgent = (i) => {
+                const card = document.getElementById(`agent-${i}`);
+                card.className = 'agent-card active';
+                document.getElementById(`a${i}-state`).textContent = agentMessages.eval[i][0];
+                const voteEl = document.getElementById(`a${i}-vote`);
+                voteEl.textContent = 'EVALUATING…'; voteEl.className = 'agent-vote vote-eval';
+                setTimeout(() => {
+                    document.getElementById(`a${i}-state`).textContent = agentMessages.eval[i][1];
+                }, delays[i] * 0.4);
+                setTimeout(() => {
+                    // Weighted accept: good concepts pass more often
+                    const accept = Math.random() < (0.35 + mdlScore * 0.5);
+                    votes[i] = accept;
+                    if (accept) {
+                        voteEl.textContent = 'ACCEPT'; voteEl.className = 'agent-vote vote-accept';
+                        document.getElementById(`a${i}-state`).textContent = agentMessages.accept[i];
+                        card.className = 'agent-card active';
+                    } else {
+                        voteEl.textContent = 'REJECT'; voteEl.className = 'agent-vote vote-reject';
+                        document.getElementById(`a${i}-state`).textContent = agentMessages.reject[i];
+                        card.className = 'agent-card reject';
+                    }
+                    // Update consensus bar
+                    const decided = votes.filter(v => v !== null).length;
+                    const accepted = votes.filter(v => v === true).length;
+                    const pct = Math.round(accepted / 3 * 100);
+                    document.getElementById('con-bar').style.width = pct + '%';
+                    document.getElementById('con-pct').textContent = pct + '%';
+
+                    if (decided === 3) finalizeICVP(votes, concept, mdlScore, aesScore);
+                }, delays[i]);
+            };
+
+            evaluateAgent(0);
+            setTimeout(() => evaluateAgent(1), 600);
+            setTimeout(() => evaluateAgent(2), 1300);
+        }
+
+        function finalizeICVP(votes, concept, mdl, aes) {
+            const accepts = votes.filter(v => v).length;
+            const pct = accepts / 3;
+            if (pct >= 0.667) {
+                document.getElementById('icvp-phase').textContent = 'COMMITTED';
+                commitToLedger(concept, mdl, aes);
+                // Boost node colors on commit
+                nodes.filter(n => n.type === 1).slice(-1).forEach(n => { n.hue = 120; n.flux = Math.min(1, n.flux + 0.3); });
+            } else {
+                document.getElementById('icvp-phase').textContent = 'REJECTED';
+                // Decay the synthesized node
+                const synNodes = nodes.filter(n => n.type === 1);
+                if (synNodes.length) synNodes[synNodes.length - 1].flux *= 0.3;
+            }
+            setTimeout(() => {
+                icvpActive = false;
+                document.getElementById('icvp-phase').textContent = 'IDLE';
+            }, 3000);
+        }
+
+        function commitToLedger(concept, mdl, aes) {
+            ledgerSeq++;
+            ledger.unshift({ concept, mdl, aes, seq: ledgerSeq, time: cycle });
+            if (ledger.length > 40) ledger.pop();
+            renderLedger();
+            document.getElementById('ledger-count').textContent = ledger.length + ' concepts';
+            // "Aha!" flash
+            const ah = document.getElementById('aha-flash');
+            ah.textContent = '✦ AHA EVENT'; ah.style.color = '#00ff9f';
+            setTimeout(() => { ah.textContent = ''; }, 2000);
+        }
+
+        function renderLedger() {
+            const list = document.getElementById('ledger-list');
+            list.innerHTML = ledger.map(item => `
+    <div class="ledger-item">
+      <div class="ledger-concept">${item.concept}</div>
+      <div class="ledger-seq">#${String(item.seq).padStart(3, '0')}</div>
+      <div class="ledger-meta">
+        <span class="ledger-score ${item.mdl > 0.7 ? 'score-good' : 'score-ok'}">MDL:${(item.mdl * 100).toFixed(0)}%</span>
+        <span class="ledger-score ${item.aes > 0.6 ? 'score-good' : 'score-ok'}">AES:${(item.aes * 100).toFixed(0)}%</span>
+        <span style="color:var(--text-dim)">T:${item.time}</span>
+      </div>
+    </div>`).join('');
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  RENDER
+        // ═══════════════════════════════════════════════════════════
+        function drawEdge(e) {
+            const ni = nodes[e.a], nj = nodes[e.b];
+            if (!ni || !nj) return;
+            if (!isFinite(ni.x) || !isFinite(ni.y) || !isFinite(nj.x) || !isFinite(nj.y)) return;
+            const dx = nj.x - ni.x, dy = nj.y - ni.y;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            if (len < 1) return;
+
+            const alpha = Math.min(0.9, 0.2 + e.w * 0.7);
+            const isNew = e.age < 40;
+            const edgeAlpha = isNew ? alpha * (e.age / 40) : alpha * 0.55;
+
+            const grd = ctx.createLinearGradient(ni.x, ni.y, nj.x, nj.y);
+            if (e.type === 1) {
+                grd.addColorStop(0, `rgba(0,255,159,${edgeAlpha})`);
+                grd.addColorStop(1, `rgba(0,200,255,${edgeAlpha * 0.5})`);
+            } else {
+                grd.addColorStop(0, `rgba(0,180,220,${edgeAlpha * 0.8})`);
+                grd.addColorStop(1, `rgba(0,100,160,${edgeAlpha * 0.3})`);
+            }
+            ctx.beginPath();
+            ctx.moveTo(ni.x, ni.y); ctx.lineTo(nj.x, nj.y);
+            ctx.strokeStyle = grd;
+            ctx.lineWidth = isNew ? 1.5 : 0.7 + e.w * 0.8;
+            ctx.stroke();
+
+            // Asymmetric arrow at 62% along edge
+            const ux = dx / len, uy = dy / len;
+            const mx = ni.x + dx * 0.62, my = ni.y + dy * 0.62;
+            const hs = 4;
+            ctx.beginPath();
+            ctx.moveTo(mx + ux * hs, my + uy * hs);
+            ctx.lineTo(mx - ux * hs - uy * hs * 0.5, my - uy * hs + ux * hs * 0.5);
+            ctx.lineTo(mx - ux * hs + uy * hs * 0.5, my - uy * hs - ux * hs * 0.5);
+            ctx.fillStyle = e.type === 1 ? `rgba(0,255,159,${edgeAlpha})` : `rgba(0,200,255,${edgeAlpha})`;
+            ctx.fill();
+        }
+
+        const NODE_COLORS = [
+            ['#00ccff', '#0055aa'],  // primitive: cyan
+            ['#00ff9f', '#005533'],  // synthesized: green
+            ['#9b5de5', '#330055'],  // smoothed: purple
+            ['#ffb300', '#553300'],  // anchor: amber
+        ];
+
+        function drawNode(n) {
+            if (!isFinite(n.x) || !isFinite(n.y)) return;
+            const pulse = Math.sin(n.pulse) * 0.4 + 0.6;
+            const [brightColor, dimColor] = NODE_COLORS[n.type % 4];
+            const r = n.r + pulse * 1.5;
+            // Glow
+            const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 3);
+            glow.addColorStop(0, brightColor + 'aa');
+            glow.addColorStop(0.5, brightColor + '22');
+            glow.addColorStop(1, 'transparent');
+            ctx.beginPath(); ctx.arc(n.x, n.y, r * 3, 0, Math.PI * 2);
+            ctx.fillStyle = glow; ctx.fill();
+            // Core
+            const core = ctx.createRadialGradient(n.x - r * 0.3, n.y - r * 0.3, 0, n.x, n.y, r);
+            core.addColorStop(0, brightColor);
+            core.addColorStop(1, dimColor);
+            ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+            ctx.fillStyle = core; ctx.fill();
+            ctx.strokeStyle = brightColor + '88';
+            ctx.lineWidth = 0.8; ctx.stroke();
+            // Flux ring
+            if (n.flux > 0.5) {
+                ctx.beginPath(); ctx.arc(n.x, n.y, r + 3 + pulse, 0, Math.PI * 2);
+                ctx.strokeStyle = brightColor + Math.floor(n.flux * 80).toString(16).padStart(2, '0');
+                ctx.lineWidth = 0.5; ctx.stroke();
+            }
+            // Label
+            ctx.fillStyle = 'rgba(200,232,240,0.5)'; ctx.font = '7px Share Tech Mono';
+            ctx.textAlign = 'center'; ctx.fillText(n.label, n.x, n.y - r - 3);
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, W, H);
+            // Background grid
+            ctx.strokeStyle = 'rgba(0,80,120,0.06)'; ctx.lineWidth = 0.5;
+            const gs = 40;
+            for (let x = 0; x < W; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+            for (let y = 0; y < H; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+            for (const e of edges) drawEdge(e);
+            for (const n of nodes) drawNode(n);
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  MAIN LOOP
+        // ═══════════════════════════════════════════════════════════
+        let opTimer = 0, opInterval = 120; // frames between ops
+
+        initNodes(20);
+
+        function mainLoop() {
+            requestAnimationFrame(mainLoop);
+            cycle++;
+            applyForces();
+            render();
+
+            opTimer++;
+            if (opTimer >= opInterval) {
+                opTimer = 0;
+                opInterval = 80 + Math.floor(Math.random() * 120);
+                const roll = Math.random();
+                if (roll < 0.35) symmetryBreak();
+                else if (roll < 0.70) conceptSynthesis();
+                else manifoldSmooth();
+                // Add fresh edge entropy
+                if (edges.length > 80) edges = edges.filter(e => e.age < 600 || Math.random() > 0.1);
+                if (nodes.length > 38) manifoldSmooth();
+                if (nodes.length < 10) initNodes(18);
+            }
+
+            // Decay flux
+            if (cycle % 60 === 0) {
+                for (const n of nodes) n.flux = Math.max(0.05, n.flux - 0.02);
+                for (const e of edges) e.w = Math.max(0.1, e.w - 0.01);
+            }
+
+            // Update topology display
+            if (cycle % 20 === 0) {
+                const topo = computeTopology();
+                const m = computeMetrics(topo);
+                document.getElementById('b0').textContent = topo.b0;
+                document.getElementById('b1').textContent = topo.b1;
+                document.getElementById('node-ct').textContent = topo.n;
+                document.getElementById('edge-ct').textContent = topo.m;
+                document.getElementById('qh-val').textContent = topo.b0 * topo.b1 || '—';
+                document.getElementById('cycle-counter').textContent = 'CYCLE: ' + cycle;
+                setBar('bar-mdl', m.mdl, 'val-mdl');
+                setBar('bar-aes', m.aesthetic, 'val-aes');
+                setBar('bar-ent', m.entropy, 'val-ent');
+                setBar('bar-scale', m.scaleInv, 'val-scale');
+                setBar('bar-chaos', m.edgeOfChaos, 'val-chaos');
+            }
+        }
+
+        mainLoop();
+    </script>
+</body>
+
+</html>

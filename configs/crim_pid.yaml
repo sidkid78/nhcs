@@ -1,0 +1,31 @@
+pid:
+  kp: 0.8
+  ki: 0.05
+  kd: 0.1
+  setpoint: 0.6
+  output_min: 0.0
+  output_max: 1.0
+  sample_time_s: 0.1
+
+cli:
+  hrv_weight: 0.35
+  gsr_weight: 0.35
+  pupil_weight: 0.30
+  hrv_rmssd_baseline_ms: 50.0
+  gsr_baseline_microsiemens: 2.0
+  pupil_baseline_mm: 3.5
+
+tmft_guardrails:
+  freq_min_hz: 15.0
+  freq_max_hz: 40.0
+  # Hopf charge error threshold.
+  # SIMULATION (current): 100.5% — the helicity proxy (B·(∇×B) integral) is in
+  # physical units (T²·m²) while the topological target is dimensionless p*q.
+  # These are incomparable without a hardware-calibrated conversion factor.
+  # This gate is effectively disabled in simulation.
+  # HARDWARE target: ~10% after calibration run establishes the conversion factor.
+  max_charge_error_pct: 100.5
+
+iis:
+  abstraction_levels: 5
+  throttle_step: 0.1

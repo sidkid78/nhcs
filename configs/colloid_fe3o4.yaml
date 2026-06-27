@@ -1,0 +1,34 @@
+# Fe3O4 superparamagnetic ferrofluid in chiral nematic host
+#
+# DISCREPANCY NOTE:
+#   info.md specifies viscosity 80-150 mPa·s (chiral ferromagnetic nematic colloid).
+#   TMFT domain report specifies ~10.5 mPa·s (oil-based superparamagnetic ferrofluid).
+#   We use the domain-report value (10.5 mPa·s) as the simulator default since the
+#   TPMM math was derived against it. Override via environment config for hardware runs.
+
+fluid:
+  dynamic_viscosity_mpa_s: 10.5       # domain report value
+  viscosity_range_mpa_s: [8.0, 15.0]  # operational envelope
+  density_kg_m3: 1200.0
+  volume_fraction_fe3o4: 0.05         # 5% nanoparticle loading
+
+magnetic:
+  saturation_magnetization_ka_m: 20.0
+  particle_diameter_nm: 10.0
+  rosensweig_threshold_mt: 45.0       # field above which spikes destroy geometry
+  operating_field_mt: 28.0            # target stable field
+
+nematic:
+  elastic_constant_k_pn: 10.0         # Frank elastic constant (pN)
+  birefringence_delta_n: 0.15
+  clearing_temperature_c: 45.0
+
+chamber:
+  # DISCREPANCY NOTE:
+  #   info.md: 50 mm sapphire chamber
+  #   TMFT domain report: 100 mm monocrystalline sapphire sphere, 5 mm wall
+  #   We use 100 mm (domain report). Override for info.md spec runs.
+  sphere_diameter_mm: 100.0
+  wall_thickness_mm: 5.0
+  material: sapphire_al2o3
+  transmission_pct: 98.5              # > 98.5% in 420-720 nm range

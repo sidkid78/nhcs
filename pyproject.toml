@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nhcs"
+version = "0.1.0"
+description = "Non-Human Conceptual Synthesis — three-layer research prototype"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # Layer 1 — Genesis Core
+    "gudhi>=3.9",
+    "ripser>=0.6",
+    "persim>=0.3",
+    "hypernetx>=2.3",
+    "networkx>=3.3",
+    "torch>=2.3",
+    "geoopt>=0.5",
+    "sentence-transformers>=3.0",
+    "pydantic>=2.7",
+    "sqlitedict>=2.1",
+    # Layer 2 — TMFT (reduced-order, pure-Python/JAX for Milestone 2)
+    "jax>=0.4.28",
+    "jaxlib>=0.4.28",
+    "scipy>=1.13",
+    "numpy<3.0.0",
+    # Layer 3 — CRIM
+    "pylsl>=1.16",
+    "simple-pid>=2.0",
+    "open3d>=0.18",
+    # Infrastructure
+    "pyzmq>=26.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "jupyter>=1.0",
+    "matplotlib>=3.9",
+    "ipywidgets>=8.1",
+]
+
+[project.scripts]
+nhcs-demo = "nhcs.orchestrator.digital_twin_demo:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["nhcs*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

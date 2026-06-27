@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AEAES — Autonomous Epistemic & Aesthetic Evaluation System</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Overpass+Mono:wght@300;400;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap');
+
+:root {
+  /* Monochromatic ivory-on-obsidian with three worker accents */
+  --void:      #04060e;
+  --void2:     #060a18;
+  --void3:     #0b1220;
+  --ivory:     #e8e0d0;
+  --ivory-d:   rgba(232,224,208,0.55);
+  --ivory-dd:  rgba(232,224,208,0.15);
+  --ivory-ddd: rgba(232,224,208,0.06);
+  --border:    rgba(232,224,208,0.09);
+  --border-b:  rgba(232,224,208,0.22);
+
+  /* Worker colors */
+  --e1:  #5bc8af;   /* Emer-1 AELF       — seafoam */
+  --e1d: rgba(91,200,175,0.12);
+  --e3:  #c8965b;   /* Emer-3 HBIFA      — terracotta */
+  --e3d: rgba(200,150,91,0.12);
+  --e4:  #7e9cc8;   /* Emer-4 RELP       — slate-blue */
+  --e4d: rgba(126,156,200,0.12);
+  --e2:  #c85b5b;   /* Emer-2 MISSING    — crimson void */
+  --e2d: rgba(200,91,91,0.10);
+
+  /* System */
+  --core: #c8b85b;   /* AEAES core — gold */
+  --cored:rgba(200,184,91,0.14);
+
+  --mono:  'Overpass Mono', monospace;
+  --serif: 'Cormorant Garamond', Georgia, serif;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100vw;height:100vh;overflow:hidden;background:var(--void);color:var(--ivory);font-family:var(--mono);font-size:11px;}
+
+/* Atmospheric gradient */
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 46%,rgba(200,184,91,0.04) 0%,transparent 55%);}
+/* Grain */
+body::after{content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.88' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.022'/%3E%3C/svg%3E");}
+
+/* ── LAYOUT ─────────────────────────────────────── */
+#app{display:grid;
+  grid-template-rows:50px 1fr 1fr 38px;
+  grid-template-columns:240px 1fr 240px;
+  height:100vh;position:relative;z-index:1;}
+
+/* ── MASTHEAD ─────────────────────────────────────── */
+#hdr{grid-column:1/-1;grid-row:1;
+  display:flex;align-items:center;padding:0 18px;
+  border-bottom:1px solid var(--border-b);
+  background:rgba(4,6,14,0.98);}
+#hdr-brand{display:flex;flex-direction:column;gap:1px;margin-right:28px;}
+#hdr-brand .title{font-family:var(--serif);font-size:15px;font-weight:300;letter-spacing:1px;
+  color:var(--core);text-shadow:0 0 24px rgba(200,184,91,0.35);}
+#hdr-brand .sub{font-size:7px;letter-spacing:3px;text-transform:uppercase;color:var(--ivory-d);}
+.hbar{flex:0 0 1px;height:24px;background:var(--border-b);margin:0 14px;}
+.hstat{flex-shrink:0;}
+.hsk{font-size:7px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ivory-dd);}
+.hsv{font-family:var(--serif);font-size:13px;font-style:italic;}
+.hdr-workers{margin-left:auto;display:flex;gap:6px;align-items:center;}
+.wbadge{font-size:7.5px;letter-spacing:1px;padding:3px 10px;border:1px solid;border-radius:1px;
+  text-transform:uppercase;font-family:var(--mono);transition:all 0.4s;}
+.wb1{color:var(--e1);border-color:var(--e1);background:var(--e1d);}
+.wb2{color:var(--e2);border-color:var(--e2);background:var(--e2d);animation:void-pulse 2s ease infinite;}
+.wb3{color:var(--e3);border-color:var(--e3);background:var(--e3d);}
+.wb4{color:var(--e4);border-color:var(--e4);background:var(--e4d);}
+@keyframes void-pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(200,91,91,0);}
+  50%{opacity:.6;}75%{box-shadow:0 0 0 6px rgba(200,91,91,0);}}
+
+/* ── SIDE COLUMNS ─────────────────────────────────── */
+.side{overflow:hidden;display:flex;flex-direction:column;border-right:1px solid var(--border);}
+.side-r{border-right:none;border-left:1px solid var(--border);}
+
+.sh{display:flex;align-items:center;justify-content:space-between;padding:5px 11px;
+  border-bottom:1px solid var(--border);}
+.sht{font-size:7.5px;letter-spacing:2px;text-transform:uppercase;font-weight:600;}
+.shs{font-size:7.5px;color:var(--ivory-d);font-family:var(--mono);}
+
+/* AELF metrics */
+.metric-block{padding:7px 11px;border-bottom:1px solid var(--border);}
+.mb-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;}
+.mb-key{font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--ivory-d);}
+.mb-val{font-family:var(--serif);font-size:18px;font-style:italic;}
+.mb-track{height:3px;background:var(--ivory-ddd);border-radius:0;overflow:hidden;margin-bottom:2px;}
+.mb-fill{height:100%;transition:width 0.5s ease;border-radius:0;}
+.mb-spark{height:24px;margin-top:4px;}
+.mb-spark canvas{display:block;width:100%;height:100%;}
+
+/* Axiom entries */
+.axiom-scroll{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.axiom-row{padding:5px 11px;border-bottom:1px solid rgba(232,224,208,0.04);animation:fIn 0.5s ease;}
+@keyframes fIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+.ar-head{display:flex;justify-content:space-between;margin-bottom:3px;}
+.ar-id{font-family:var(--serif);font-size:10px;font-style:italic;color:var(--e1);}
+.ar-t{font-family:var(--serif);font-size:14px;font-weight:600;color:var(--ivory);}
+.ar-st{font-size:7px;letter-spacing:1px;text-transform:uppercase;padding:1px 5px;border:1px solid;border-radius:1px;}
+.st-ax{color:var(--e1);border-color:var(--e1);}
+.st-bif{color:var(--e3);border-color:var(--e3);animation:fIn .3s ease infinite alternate;}
+.st-dis{color:var(--ivory-d);border-color:var(--border);opacity:.5;}
+.ar-bars{display:grid;grid-template-columns:18px 1fr 28px;gap:2px 4px;font-size:7.5px;align-items:center;}
+.ar-bk{color:var(--ivory-dd);}
+.ar-bv{text-align:right;color:var(--ivory-d);}
+
+/* RELP side */
+.ver-entry{padding:5px 11px;border-bottom:1px solid rgba(232,224,208,0.04);animation:fIn 0.4s ease;}
+.ve-head{display:flex;gap:8px;align-items:baseline;margin-bottom:3px;}
+.ve-ver{font-family:var(--serif);font-size:11px;font-style:italic;}
+.ve-v-active{color:var(--e4);}
+.ve-v-old{color:var(--ivory-dd);}
+.ve-st{font-size:7px;padding:1px 5px;border:1px solid;border-radius:1px;letter-spacing:1px;text-transform:uppercase;}
+.vst-a{color:var(--e1);border-color:var(--e1);}
+.vst-d{color:var(--ivory-dd);border-color:var(--border);}
+.vst-r{color:var(--e2);border-color:var(--e2);}
+.ve-util{font-family:var(--serif);font-size:16px;font-weight:600;}
+.ve-detail{font-size:7.5px;color:var(--ivory-d);margin-top:2px;}
+
+/* BD/Sym compact */
+.compact-row{padding:5px 11px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.cr-label{font-size:8px;color:var(--ivory-d);letter-spacing:1px;text-transform:uppercase;width:80px;flex-shrink:0;}
+.cr-track{flex:1;height:5px;background:var(--ivory-ddd);border-radius:0;overflow:hidden;position:relative;}
+.cr-fill{height:100%;transition:width 0.4s ease;}
+.cr-threshold{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.2);}
+.cr-val{font-size:9px;min-width:38px;text-align:right;}
+
+/* ── CENTER: Architecture canvas ─────────────────────── */
+#center{grid-column:2;grid-row:2/4;position:relative;overflow:hidden;
+  background:radial-gradient(ellipse at 50% 50%,rgba(12,16,32,0.9) 0%,var(--void) 80%);}
+#arch-canvas{display:block;width:100%;height:100%;}
+
+/* ── BOTTOM BAR ───────────────────────────────────────── */
+#bottom-bar{grid-column:1/-1;grid-row:4;
+  display:flex;align-items:center;padding:0 14px;gap:16px;
+  border-top:1px solid var(--border-b);background:rgba(4,6,14,0.99);
+  overflow:hidden;}
+.bb-item{display:flex;align-items:center;gap:6px;font-size:8px;white-space:nowrap;}
+.bb-key{color:var(--ivory-dd);letter-spacing:1px;text-transform:uppercase;}
+.bb-val{font-family:var(--serif);font-size:11px;font-style:italic;}
+.bb-sep{width:1px;height:14px;background:var(--border);flex-shrink:0;margin:0 4px;}
+.bb-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+
+/* Missing module alert */
+.void-alert{
+  padding:3px 12px;border:1px solid var(--e2);
+  background:var(--e2d);color:var(--e2);
+  font-size:8px;letter-spacing:1.5px;text-transform:uppercase;
+  animation:void-pulse 1.8s ease infinite;
+}
+
+/* Canvas event label */
+#arch-label{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  font-family:var(--serif);font-size:11px;font-style:italic;letter-spacing:1px;
+  color:var(--core);opacity:0;pointer-events:none;text-align:center;
+  text-shadow:0 0 20px rgba(200,184,91,0.6);transition:opacity 0.5s;white-space:nowrap;}
+#arch-label.show{opacity:1;}
+
+/* Emer-2 void overlay inside center */
+#e2-void{position:absolute;pointer-events:none;opacity:0;transition:opacity 0.5s;}
+#e2-void.show{opacity:1;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ MASTHEAD ══════════════════════════════════════════ -->
+  <header id="hdr">
+    <div id="hdr-brand">
+      <div class="title">Autonomous Epistemic & Aesthetic Evaluation System</div>
+      <div class="sub">AEAES · Integrated Architecture · Workers Emer-1, 3, 4 · Worker Emer-2 VOID</div>
+    </div>
+    <div class="hbar"></div>
+    <div class="hstat"><div class="hsk">System Truth</div><div class="hsv" id="hs-truth" style="color:var(--e1)">—</div></div>
+    <div class="hbar"></div>
+    <div class="hstat"><div class="hsk">Eval Version</div><div class="hsv" id="hs-ver" style="color:var(--e4)">—</div></div>
+    <div class="hbar"></div>
+    <div class="hstat"><div class="hsk">BD Accuracy</div><div class="hsv" id="hs-bd" style="color:var(--e3)">—</div></div>
+    <div class="hbar"></div>
+    <div class="hstat"><div class="hsk">Aesthetic Gap</div><div class="hsv" style="color:var(--e2);font-style:italic;font-size:12px;">EMER-2 NO DATA</div></div>
+    <div class="hbar"></div>
+    <div class="hstat"><div class="hsk">Axioms in Core</div><div class="hsv" id="hs-axioms" style="color:var(--ivory)">—</div></div>
+    <div class="hdr-workers">
+      <div class="wbadge wb1">EMER-1 · AELF</div>
+      <div class="wbadge wb3">EMER-3 · HBIFA</div>
+      <div class="wbadge wb4">EMER-4 · RELP</div>
+      <div class="wbadge wb2">EMER-2 · VOID</div>
+    </div>
+  </header>
+
+  <!-- ══ LEFT: AELF Live ═══════════════════════════════════ -->
+  <div class="side" style="grid-column:1;grid-row:2/4;">
+    <div class="sh"><div class="sht" style="color:var(--e1);">Emer-1 · AELF</div><div class="shs">Fact Engine</div></div>
+
+    <div class="metric-block">
+      <div class="mb-top"><div class="mb-key">Resonance Coeff. RC</div><div class="mb-val" id="m-rc" style="color:var(--e1)">—</div></div>
+      <div class="mb-track"><div class="mb-fill" id="mf-rc" style="background:var(--e1);width:0%"></div></div>
+      <div class="mb-spark"><canvas id="sp-rc"></canvas></div>
+    </div>
+    <div class="metric-block">
+      <div class="mb-top"><div class="mb-key">Anticipatory Yield AY</div><div class="mb-val" id="m-ay" style="color:var(--e1)">—</div></div>
+      <div class="mb-track"><div class="mb-fill" id="mf-ay" style="background:var(--e1);width:0%"></div></div>
+      <div class="mb-spark"><canvas id="sp-ay"></canvas></div>
+    </div>
+    <div class="metric-block">
+      <div class="mb-top"><div class="mb-key">Truth Scalar T(P)</div><div class="mb-val" id="m-tp" style="color:var(--core)">—</div></div>
+      <div class="mb-track">
+        <div class="mb-fill" id="mf-tp" style="background:linear-gradient(90deg,var(--e1),var(--core));width:0%"></div>
+      </div>
+      <div class="mb-spark"><canvas id="sp-tp"></canvas></div>
+    </div>
+
+    <div class="sh"><div class="sht" style="color:var(--e1);">Epistemic Core</div><div class="shs" id="axiom-ct">0 axioms</div></div>
+    <div class="axiom-scroll" id="axiom-list"></div>
+  </div>
+
+  <!-- ══ CENTER: Architecture ══════════════════════════════ -->
+  <div id="center">
+    <canvas id="arch-canvas"></canvas>
+    <div id="arch-label"></div>
+    <div id="e2-void"></div>
+  </div>
+
+  <!-- ══ RIGHT: RELP + HBIFA ════════════════════════════════ -->
+  <div class="side side-r" style="grid-column:3;grid-row:2/4;">
+    <div class="sh"><div class="sht" style="color:var(--e4);">Emer-4 · RELP</div><div class="shs" id="relp-phase">idle</div></div>
+
+    <div class="metric-block">
+      <div class="mb-top"><div class="mb-key">Utility U(v)</div><div class="mb-val" id="m-util" style="color:var(--e4)">—</div></div>
+      <div class="mb-track"><div class="mb-fill" id="mf-util" style="background:var(--e4);width:0%"></div></div>
+      <div class="mb-spark"><canvas id="sp-util"></canvas></div>
+    </div>
+    <div class="metric-block">
+      <div class="mb-top"><div class="mb-key">Complexity / Entropy</div><div class="mb-val" id="m-ent" style="color:var(--ivory-d)">—</div></div>
+      <div class="mb-track"><div class="mb-fill" id="mf-ent" style="background:linear-gradient(90deg,var(--e4),var(--e2));width:0%"></div></div>
+    </div>
+
+    <div class="sh"><div class="sht" style="color:var(--e4);">CVS History</div><div class="shs" id="cvs-ct">0 versions</div></div>
+    <div style="height:100px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;" id="cvs-list"></div>
+
+    <div class="sh" style="margin-top:0;"><div class="sht" style="color:var(--e3);">Emer-3 · HBIFA</div><div class="shs">Isolation</div></div>
+
+    <div class="compact-row">
+      <div class="cr-label">BD Accuracy</div>
+      <div class="cr-track">
+        <div class="cr-fill" id="cr-bd" style="background:var(--e3);width:30%"></div>
+        <div class="cr-threshold" style="left:51%"></div>
+      </div>
+      <div class="cr-val" id="cv-bd" style="color:var(--e3)">0.300</div>
+    </div>
+    <div class="compact-row">
+      <div class="cr-label">Sym. Parity</div>
+      <div class="cr-track"><div class="cr-fill" id="cr-sym" style="background:var(--e1);width:80%"></div></div>
+      <div class="cr-val" id="cv-sym" style="color:var(--e1)">80%</div>
+    </div>
+    <div class="compact-row">
+      <div class="cr-label">NSL Coverage</div>
+      <div class="cr-track"><div class="cr-fill" id="cr-nsl" style="background:var(--e3);width:90%"></div></div>
+      <div class="cr-val" id="cv-nsl" style="color:var(--e3)">0.92</div>
+    </div>
+
+    <div class="sh"><div class="sht" style="color:var(--e2);">Emer-2 · AESTHETIC GAP</div><div class="shs">⚠ no data</div></div>
+    <div style="padding:10px 11px;flex:1;display:flex;flex-direction:column;justify-content:space-between;">
+      <div style="font-family:var(--serif);font-size:11px;font-style:italic;color:var(--e2);line-height:1.6;opacity:0.8;">
+        Worker Emer-2 returned no findings.<br>
+        Aesthetic merit module absent.
+      </div>
+      <div style="padding:8px;border:1px dashed var(--e2);background:var(--e2d);border-radius:1px;margin-top:8px;">
+        <div style="font-size:7.5px;letter-spacing:1px;text-transform:uppercase;color:var(--e2);margin-bottom:4px;">INTERIM FALLBACK</div>
+        <div style="font-size:8.5px;color:var(--ivory-d);line-height:1.6;font-style:italic;font-family:var(--serif);">
+          Aesthetic merit ≡ structural resonance:<br>
+          max informational density<br>
+          at minimum entropy
+        </div>
+        <div style="margin-top:6px;">
+          <div style="font-size:7.5px;color:var(--ivory-dd);margin-bottom:3px;">Interim AES score (RC-derived)</div>
+          <div style="height:4px;background:var(--ivory-ddd);overflow:hidden;">
+            <div id="aes-interim" style="height:100%;background:linear-gradient(90deg,var(--e2),var(--core));transition:width 0.5s;width:0%"></div>
+          </div>
+          <div style="font-family:var(--serif);font-size:14px;font-style:italic;color:var(--ivory-d);margin-top:3px;" id="aes-val">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ BOTTOM BAR ════════════════════════════════════════ -->
+  <div id="bottom-bar">
+    <div class="bb-item"><div class="bb-key">Pipeline</div><div class="bb-val" style="color:var(--e1)">●</div><div class="bb-val">ONLINE</div></div>
+    <div class="bb-sep"></div>
+    <div class="bb-item"><div class="bb-key">Ops</div><div class="bb-val" id="bb-ops">0</div></div>
+    <div class="bb-sep"></div>
+    <div class="bb-item"><div class="bb-key">Cycles</div><div class="bb-val" id="bb-cycles">0</div></div>
+    <div class="bb-sep"></div>
+    <div class="bb-item"><div class="bb-key">Packets cleared</div><div class="bb-val" id="bb-clear">0</div></div>
+    <div class="bb-sep"></div>
+    <div class="bb-item"><div class="bb-key">Entities redacted</div><div class="bb-val" id="bb-redact">0</div></div>
+    <div class="bb-sep"></div>
+    <div class="bb-item"><div class="bb-key">Rollbacks</div><div class="bb-val" id="bb-rb" style="color:var(--e2)">0</div></div>
+    <div class="bb-sep"></div>
+    <div class="bb-item"><div class="bb-key">Crystallizations</div><div class="bb-val" id="bb-cryst" style="color:var(--e1)">0</div></div>
+    <div class="bb-sep"></div>
+    <div class="bb-item"><div class="bb-key">Promotions</div><div class="bb-val" id="bb-promo" style="color:var(--e4)">0</div></div>
+
+    <div class="bb-right">
+      <div class="void-alert">⚠ WORKER EMER-2 — AESTHETIC MERIT MODULE: NO DATA</div>
+      <div class="bb-sep"></div>
+      <div class="bb-item"><div class="bb-key">AEAES</div>
+        <div style="font-family:var(--serif);font-size:12px;font-style:italic;color:var(--core);">
+          EVALUATING
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+const lerp = (a,b,t2) => a+(b-a)*t2;
+const clamp= (v,lo,hi) => Math.max(lo,Math.min(hi,v));
+const rnd  = (a,b) => a+Math.random()*(b-a);
+const isF  = v => isFinite(v)&&!isNaN(v);
+
+// ── Shared sim state ──────────────────────────────────────
+let t=0, prevNow=performance.now();
+let ops=0, cycles=0, cleared=0, redacted=0, rollbacks=0, crystallizations=0, promotions=0;
+
+// AELF
+let RC=0.62, AY=0.58, TP=0.0, α=0.6, β=0.4;
+let RCt=0.70, AYt=0.65;
+const histRC=[], histAY=[], histTP=[], histUtil=[];
+const HIST=90, Ωc=0.72, Ωd=0.28;
+
+// Axioms
+let axioms=[], axSeq=0;
+const GREEK=['Α','Β','Γ','Δ','Ε','Ζ','Η','Θ','Ι','Κ','Λ','Μ','Ν','Ξ','Ο','Π','Ρ','Σ','Τ','Υ','Φ','Χ','Ψ','Ω'];
+function axName(n){return `Axiom${GREEK[n%24]}`;}
+
+// RELP
+let version={major:1,minor:0,patch:0}, utilV=0.64, complexity=0.32;
+let relpPhase='idle', relpTimer=0, relpDur=4;
+let cvsEntries=[], cvsSeq=0, discards=0;
+
+// HBIFA
+let bdAccuracy=0.31, symParity=0.80, nslCoverage=0.92;
+let bdTarget=0.31;
+
+// Aesthetic interim (RC-derived)
+let aesInterim=0;
+
+// ── Canvas ─────────────────────────────────────────────────
+const cvA = document.getElementById('arch-canvas');
+const ctxA = cvA.getContext('2d');
+function resize(){
+  cvA.width=cvA.parentElement.offsetWidth;
+  cvA.height=cvA.parentElement.offsetHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ── Architecture nodes ─────────────────────────────────────
+// Five nodes: HBIFA → AELF → AEAES_CORE ← RELP, EMER2_VOID → AEAES_CORE
+let archNodes, archEdges;
+function buildArch(W,H){
+  const cx=W*0.50, cy=H*0.48;
+  archNodes = [
+    {id:'hbifa', label:'HBIFA\nEMER-3', col:'#c8965b', x:cx-W*0.28, y:cy-H*0.10, r:28, pulse:0, worker:'e3'},
+    {id:'aelf',  label:'AELF\nEMER-1', col:'#5bc8af', x:cx-W*0.10, y:cy-H*0.18, r:28, pulse:0.5, worker:'e1'},
+    {id:'relp',  label:'RELP\nEMER-4', col:'#7e9cc8', x:cx+W*0.10, y:cy-H*0.18, r:28, pulse:1.1, worker:'e4'},
+    {id:'e2void',label:'EMER-2\nVOID',  col:'#c85b5b', x:cx+W*0.28, y:cy-H*0.10, r:24, pulse:1.6, worker:'e2'},
+    {id:'core',  label:'AEAES\nCORE',   col:'#c8b85b', x:cx,        y:cy+H*0.04, r:38, pulse:2.1, worker:'core'},
+  ];
+  archEdges = [
+    {from:'hbifa', to:'aelf',  label:'de-morphed stream', active:true},
+    {from:'aelf',  to:'core',  label:'crystallized facts', active:true},
+    {from:'relp',  to:'core',  label:'version+criteria',  active:true},
+    {from:'hbifa', to:'core',  label:'BD·sym integrity',  active:true},
+    {from:'e2void',to:'core',  label:'MISSING',           active:false, void:true},
+    {from:'relp',  to:'aelf',  label:'criterion update',  active:true},
+  ];
+}
+
+// ── Packet animation ───────────────────────────────────────
+let archPackets=[];
+let pktTimer=0;
+
+function spawnPkt(){
+  const nonVoid=archEdges.filter(e=>!e.void&&e.active);
+  if(!nonVoid.length) return;
+  const edge=nonVoid[Math.floor(Math.random()*nonVoid.length)];
+  const fn=archNodes.find(n=>n.id===edge.from);
+  const tn=archNodes.find(n=>n.id===edge.to);
+  if(!fn||!tn) return;
+  archPackets.push({
+    edge, fx:fn.x, fy:fn.y, tx:tn.x, ty:tn.y,
+    progress:0, speed:rnd(0.004,0.010), col:fn.col,
+    alpha:1
+  });
+}
+
+// ── Draw architecture ──────────────────────────────────────
+function drawArch(dt){
+  const W=cvA.width, H=cvA.height;
+  if(W<2||H<2) return;
+  buildArch(W,H);
+  ctxA.clearRect(0,0,W,H);
+
+  // Background grid
+  ctxA.strokeStyle='rgba(232,224,208,0.025)'; ctxA.lineWidth=0.5;
+  const gs=44;
+  for(let x=0;x<W;x+=gs){ctxA.beginPath();ctxA.moveTo(x,0);ctxA.lineTo(x,H);ctxA.stroke();}
+  for(let y=0;y<H;y+=gs){ctxA.beginPath();ctxA.moveTo(0,y);ctxA.lineTo(W,y);ctxA.stroke();}
+
+  // Draw edges
+  archEdges.forEach(e=>{
+    const fn=archNodes.find(n=>n.id===e.from);
+    const tn=archNodes.find(n=>n.id===e.to);
+    if(!fn||!tn||!isF(fn.x)||!isF(tn.x)) return;
+    const grd=ctxA.createLinearGradient(fn.x,fn.y,tn.x,tn.y);
+    if(e.void){
+      grd.addColorStop(0,'rgba(200,91,91,0.15)');
+      grd.addColorStop(0.5,'rgba(200,91,91,0.06)');
+      grd.addColorStop(1,'rgba(200,91,91,0.02)');
+      ctxA.setLineDash([6,8]);
+    } else {
+      grd.addColorStop(0,fn.col+'44');
+      grd.addColorStop(1,tn.col+'44');
+      ctxA.setLineDash([]);
+    }
+    ctxA.beginPath();ctxA.moveTo(fn.x,fn.y);ctxA.lineTo(tn.x,tn.y);
+    ctxA.strokeStyle=grd; ctxA.lineWidth=e.void?0.8:1.2; ctxA.stroke();
+    ctxA.setLineDash([]);
+    // Edge label at midpoint
+    const mx=(fn.x+tn.x)/2, my=(fn.y+tn.y)/2;
+    if(!isF(mx)||!isF(my)) return;
+    ctxA.fillStyle=e.void?'rgba(200,91,91,0.4)':'rgba(232,224,208,0.25)';
+    ctxA.font='8px Overpass Mono';ctxA.textAlign='center';
+    ctxA.fillText(e.label, mx, my-6);
+  });
+
+  // Update & draw packets
+  pktTimer+=dt;
+  if(pktTimer>0.6){pktTimer=0;spawnPkt();cleared++;}
+
+  archPackets.forEach((p,i)=>{
+    p.progress+=p.speed;
+    if(p.progress>=1){archPackets.splice(i,1);return;}
+    const px=lerp(p.fx,p.tx,p.progress), py=lerp(p.fy,p.ty,p.progress);
+    if(!isF(px)||!isF(py)) return;
+    const glow=ctxA.createRadialGradient(px,py,0,px,py,8);
+    glow.addColorStop(0,p.col+'88');glow.addColorStop(1,'transparent');
+    ctxA.beginPath();ctxA.arc(px,py,8,0,Math.PI*2);
+    ctxA.fillStyle=glow;ctxA.fill();
+    ctxA.beginPath();ctxA.arc(px,py,3,0,Math.PI*2);
+    ctxA.fillStyle=p.col;ctxA.fill();
+  });
+
+  // Draw nodes
+  archNodes.forEach(n=>{
+    if(!isF(n.x)||!isF(n.y)) return;
+    n.pulse+=dt*(n.id==='core'?0.8:0.5);
+    const pulse=0.08*Math.sin(n.pulse)+1;
+    const isVoid=n.id==='e2void';
+    const isCore=n.id==='core';
+
+    // Outer glow
+    const glowR=n.r*(isCore?3.5:2.5)*pulse;
+    const glow=ctxA.createRadialGradient(n.x,n.y,0,n.x,n.y,glowR);
+    glow.addColorStop(0,n.col+(isVoid?'18':'28'));glow.addColorStop(1,'transparent');
+    ctxA.beginPath();ctxA.arc(n.x,n.y,glowR,0,Math.PI*2);
+    ctxA.fillStyle=glow;ctxA.fill();
+
+    // Ring (void = dashed)
+    if(isVoid){
+      ctxA.setLineDash([5,5]);
+      ctxA.beginPath();ctxA.arc(n.x,n.y,n.r*pulse,0,Math.PI*2);
+      ctxA.strokeStyle=n.col+'55';ctxA.lineWidth=1;ctxA.stroke();
+      ctxA.setLineDash([]);
+    } else {
+      ctxA.beginPath();ctxA.arc(n.x,n.y,n.r*pulse,0,Math.PI*2);
+      const bg=ctxA.createRadialGradient(n.x-n.r*0.3,n.y-n.r*0.3,0,n.x,n.y,n.r*pulse);
+      bg.addColorStop(0,n.col+(isCore?'55':'33'));bg.addColorStop(1,n.col+'0a');
+      ctxA.fillStyle=bg;ctxA.fill();
+      ctxA.strokeStyle=n.col+(isCore?'cc':'88');ctxA.lineWidth=isCore?1.8:1;ctxA.stroke();
+    }
+
+    // T(P) arc on core
+    if(isCore&&isF(TP)){
+      const arcEnd=-Math.PI/2+TP*Math.PI*2;
+      ctxA.beginPath();ctxA.arc(n.x,n.y,n.r+7,-Math.PI/2,arcEnd);
+      ctxA.strokeStyle='rgba(200,184,91,0.6)';ctxA.lineWidth=3;ctxA.stroke();
+    }
+
+    // Label
+    const lines=n.label.split('\n');
+    ctxA.textAlign='center';
+    lines.forEach((l,j)=>{
+      const ly=n.y+j*12-(lines.length-1)*6;
+      if(!isF(ly)) return;
+      if(j===0){
+        ctxA.font=`600 ${isCore?11:9}px Overpass Mono`;
+        ctxA.fillStyle=isVoid?n.col+'88':n.col+(isCore?'ee':'cc');
+      } else {
+        ctxA.font='300 7px Overpass Mono';
+        ctxA.fillStyle='rgba(232,224,208,0.35)';
+      }
+      ctxA.fillText(l,n.x,ly+4);
+    });
+
+    // VOID cross
+    if(isVoid){
+      const rs=n.r*0.4;
+      ctxA.beginPath();
+      ctxA.moveTo(n.x-rs,n.y-rs);ctxA.lineTo(n.x+rs,n.y+rs);
+      ctxA.moveTo(n.x+rs,n.y-rs);ctxA.lineTo(n.x-rs,n.y+rs);
+      ctxA.strokeStyle=n.col+'44';ctxA.lineWidth=1;ctxA.stroke();
+    }
+  });
+
+  // AEAES evaluation annotation below core
+  const coreN=archNodes.find(n=>n.id==='core');
+  if(coreN&&isF(coreN.y)){
+    const ly2=coreN.y+coreN.r+22;
+    if(isF(ly2)){
+      ctxA.font='italic 11px Cormorant Garamond';ctxA.textAlign='center';
+      ctxA.fillStyle='rgba(200,184,91,0.5)';
+      ctxA.fillText(`T(P) = ${TP.toFixed(4)}   ·   U(v) = ${utilV.toFixed(4)}`, coreN.x, ly2);
+      ctxA.font='9px Overpass Mono';ctxA.fillStyle='rgba(200,91,91,0.45)';
+      ctxA.fillText('aesthetic module: ABSENT — interim RC fallback active', coreN.x, ly2+15);
+    }
+  }
+}
+
+// ── Sparkline ──────────────────────────────────────────────
+function spark(id, hist, col){
+  const cv=document.getElementById(id);
+  if(!cv) return;
+  const W=cv.offsetWidth, H=cv.offsetHeight;
+  if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}
+  if(W<2||H<2) return;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  if(hist.length<2) return;
+  const min=Math.min(...hist)-0.02, max=Math.max(...hist)+0.02;
+  const range=max-min||0.01;
+  ctx.beginPath();ctx.strokeStyle=col;ctx.lineWidth=1.3;
+  hist.forEach((v,i)=>{
+    const x=i/(hist.length-1)*W, y=H-((v-min)/range*(H-2))-1;
+    if(!isF(x)||!isF(y)) return;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+}
+
+// ── AELF update ────────────────────────────────────────────
+let aelfTimer=0, axiomCrystTimer=0;
+const GREEK2=['Α','Β','Γ','Δ','Ε','Ζ','Η','Θ','Ι','Κ','Λ','Μ','Ν','Ξ','Ο','Π','Ρ','Σ','Τ','Υ','Φ','Χ','Ψ','Ω'];
+
+function tickAELF(dt){
+  aelfTimer+=dt;
+  if(aelfTimer<0.35) return;
+  aelfTimer=0;
+  RCt=clamp(RCt+rnd(-0.025,0.03),0.2,0.97);
+  AYt=clamp(AYt+rnd(-0.02,0.028),0.2,0.95);
+  RC=lerp(RC,RCt,0.4); AY=lerp(AY,AYt,0.4);
+  TP=clamp(α*RC+β*AY,0,1);
+  aesInterim=clamp(RC*0.7+(1-Math.abs(TP-0.5)*2)*0.3,0,1);
+
+  histRC.push(RC); histAY.push(AY); histTP.push(TP);
+  if(histRC.length>HIST){histRC.shift();histAY.shift();histTP.shift();}
+
+  // Crystallize axioms
+  axiomCrystTimer+=0.35;
+  if(axiomCrystTimer>rnd(5,12)&&TP>Ωc){
+    axiomCrystTimer=0;
+    axSeq++;
+    axioms.unshift({
+      id:axSeq, name:axName(axSeq),
+      RC:RC, AY:AY, T:TP,
+      state:Math.random()<0.08?'bifurcating':'axiom',
+      age:0,
+    });
+    if(axioms.length>10) axioms.pop();
+    crystallizations++;
+    document.getElementById('bb-cryst').textContent=crystallizations;
+  }
+  // Age axioms
+  axioms.forEach(a=>{
+    a.age+=0.35;
+    a.T=clamp(a.T+rnd(-0.01,0.005),0,1);
+    if(a.T<Ωd&&a.age>15) a.state='dissolving';
+  });
+  axioms=axioms.filter(a=>a.state!=='dissolving'||Math.random()>0.05);
+
+  document.getElementById('m-rc').textContent=RC.toFixed(4);
+  document.getElementById('mf-rc').style.width=(RC*100)+'%';
+  document.getElementById('m-ay').textContent=AY.toFixed(4);
+  document.getElementById('mf-ay').style.width=(AY*100)+'%';
+  document.getElementById('m-tp').textContent=TP.toFixed(4);
+  document.getElementById('mf-tp').style.width=(TP*100)+'%';
+  document.getElementById('aes-interim').style.width=(aesInterim*100)+'%';
+  document.getElementById('aes-val').textContent=aesInterim.toFixed(4);
+  document.getElementById('hs-truth').textContent=TP.toFixed(4);
+  document.getElementById('hs-axioms').textContent=axioms.length;
+  document.getElementById('axiom-ct').textContent=axioms.length+' axioms';
+  spark('sp-rc',histRC,'#5bc8af');
+  spark('sp-ay',histAY,'#5bc8af');
+  spark('sp-tp',histTP,'#c8b85b');
+
+  renderAxioms();
+}
+
+function renderAxioms(){
+  const el=document.getElementById('axiom-list');
+  el.innerHTML=axioms.slice(0,8).map(a=>{
+    const sc=a.state==='bifurcating'?'st-bif':a.state==='dissolving'?'st-dis':'st-ax';
+    const sl=a.state==='bifurcating'?'BIFURC':a.state==='dissolving'?'DISS.':'AXIOM';
+    return `<div class="axiom-row">
+      <div class="ar-head">
+        <div class="ar-id">${a.name}</div>
+        <div class="ar-t">${a.T.toFixed(4)}</div>
+        <div class="ar-st ${sc}">${sl}</div>
+      </div>
+      <div class="ar-bars">
+        <span class="ar-bk">RC</span>
+        <div class="mb-track" style="margin:0"><div class="mb-fill" style="background:#5bc8af;width:${a.RC*100}%"></div></div>
+        <span class="ar-bv">${a.RC.toFixed(3)}</span>
+        <span class="ar-bk">AY</span>
+        <div class="mb-track" style="margin:0"><div class="mb-fill" style="background:#5bc8af;width:${a.AY*100}%"></div></div>
+        <span class="ar-bv">${a.AY.toFixed(3)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── RELP update ────────────────────────────────────────────
+let relpOpAcc=0;
+function tickRELP(dt){
+  relpOpAcc+=dt*100;
+  ops=Math.floor(relpOpAcc);
+  relpTimer+=dt;
+  // Phase cycle
+  if(relpTimer>=relpDur){
+    relpTimer=0;
+    const phases=['idle','audit','synth','mcg','promote','recurse'];
+    const cur=phases.indexOf(relpPhase);
+    relpPhase=phases[(cur+1)%phases.length];
+    relpDur=rnd(2.5,5.0);
+    if(relpPhase==='promote'){
+      const promoted=Math.random()<0.7;
+      if(promoted){
+        promotions++;
+        const nv={...version};
+        if(Math.random()<0.2) nv.major++;
+        else if(Math.random()<0.5) nv.minor++;
+        else nv.patch++;
+        version=nv;
+        utilV=clamp(utilV+rnd(-0.02,0.06),0.3,0.97);
+        cvsSeq++;
+        cvsEntries.unshift({
+          ver:`v${version.major}.${version.minor}.${version.patch}`,
+          util:utilV, status:'active', seq:cvsSeq,
+        });
+        if(cvsEntries.length>1) cvsEntries[1].status='old';
+        if(cvsEntries.length>6) cvsEntries.pop();
+        document.getElementById('bb-promo').textContent=promotions;
+        renderCVS();
+      } else {
+        discards++;
+        cvsSeq++;
+        cvsEntries.unshift({
+          ver:`v${version.major}.${version.minor}.${version.patch}+shadow`,
+          util:clamp(utilV+rnd(-0.1,-0.01),0.2,0.8),
+          status:'discarded', seq:cvsSeq,
+        });
+        if(cvsEntries.length>6) cvsEntries.pop();
+        renderCVS();
+      }
+    }
+    if(relpPhase==='recurse'&&Math.random()<0.07){
+      rollbacks++;
+      document.getElementById('bb-rb').textContent=rollbacks;
+    }
+  }
+
+  complexity=clamp(complexity+rnd(-0.005,0.008)*dt*3,0.1,0.92);
+  histUtil.push(utilV);
+  if(histUtil.length>HIST) histUtil.shift();
+
+  document.getElementById('relp-phase').textContent=relpPhase.toUpperCase();
+  document.getElementById('m-util').textContent=utilV.toFixed(4);
+  document.getElementById('mf-util').style.width=(utilV*100)+'%';
+  document.getElementById('m-ent').textContent=complexity.toFixed(4);
+  document.getElementById('mf-ent').style.width=(complexity*100)+'%';
+  document.getElementById('hs-ver').textContent=`v${version.major}.${version.minor}.${version.patch}`;
+  spark('sp-util',histUtil,'#7e9cc8');
+  document.getElementById('bb-ops').textContent=ops.toLocaleString();
+  document.getElementById('bb-cycles').textContent=cycles;
+  document.getElementById('bb-clear').textContent=cleared;
+}
+
+function renderCVS(){
+  const el=document.getElementById('cvs-list');
+  el.innerHTML=cvsEntries.map(e=>{
+    const vc=e.status==='active'?'ve-v-active':'ve-v-old';
+    const sc=e.status==='active'?'vst-a':e.status==='discarded'?'vst-d':'vst-d';
+    const sl=e.status==='active'?'ACTIVE':e.status==='discarded'?'DISCARD':'HIST';
+    return `<div class="ver-entry">
+      <div class="ve-head">
+        <div class="ve-ver ${vc}">${e.ver}</div>
+        <div class="ve-st ${sc}">${sl}</div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:baseline;">
+        <div class="ve-util" style="color:var(--e4)">${e.util.toFixed(4)}</div>
+        <div class="ve-detail">#${e.seq}</div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('cvs-ct').textContent=cvsEntries.length+' versions';
+}
+
+// ── HBIFA update ───────────────────────────────────────────
+let hbifaTimer=0;
+function tickHBIFA(dt){
+  hbifaTimer+=dt;
+  if(hbifaTimer<0.4) return;
+  hbifaTimer=0;
+  bdTarget=clamp(bdTarget+rnd(-0.02,0.018),0.12,0.65);
+  bdAccuracy=lerp(bdAccuracy,bdTarget,0.4);
+  symParity=clamp(symParity+rnd(-0.015,0.018),0.55,0.98);
+  nslCoverage=clamp(nslCoverage+rnd(-0.008,0.01),0.70,0.99);
+  redacted+=Math.floor(rnd(0,3));
+  document.getElementById('cr-bd').style.width=(bdAccuracy*100)+'%';
+  document.getElementById('cr-bd').style.background=bdAccuracy>0.51?'#c85b5b':'#c8965b';
+  document.getElementById('cv-bd').textContent=bdAccuracy.toFixed(3);
+  document.getElementById('cv-bd').style.color=bdAccuracy>0.51?'#c85b5b':'#c8965b';
+  document.getElementById('cr-sym').style.width=(symParity*100)+'%';
+  document.getElementById('cv-sym').textContent=(symParity*100).toFixed(0)+'%';
+  document.getElementById('cr-nsl').style.width=(nslCoverage*100)+'%';
+  document.getElementById('cv-nsl').textContent=nslCoverage.toFixed(3);
+  document.getElementById('hs-bd').textContent=bdAccuracy.toFixed(3);
+  document.getElementById('bb-redact').textContent=redacted;
+}
+
+// ── Cycle counter ──────────────────────────────────────────
+let cycleAccum=0;
+function tickCycles(dt){
+  cycleAccum+=dt;
+  if(cycleAccum>6){cycleAccum=0;cycles++;}
+}
+
+// ── Main loop ──────────────────────────────────────────────
+// Seed initial CVS
+cvsEntries.push({ver:'v1.0.0',util:0.624,status:'active',seq:0});
+renderCVS();
+
+function tick(){
+  requestAnimationFrame(tick);
+  const now=performance.now();
+  const dt=Math.min((now-prevNow)/1000,0.05);
+  prevNow=now; t+=dt;
+
+  tickAELF(dt);
+  tickRELP(dt);
+  tickHBIFA(dt);
+  tickCycles(dt);
+  drawArch(dt);
+}
+
+tick();
+</script>
+</body>
+</html>

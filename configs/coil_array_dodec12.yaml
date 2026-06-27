@@ -1,0 +1,33 @@
+# 12-channel dodecahedral Helmholtz-like coil array
+#
+# GEOMETRY NOTE:
+#   Face-centre unit normals are vertices of a regular icosahedron (dual of dodecahedron).
+#   Formula: (0, ±1, ±φ)/√(1+φ²) and cyclic permutations, φ=(1+√5)/2=1.61803.
+#   Corrected from earlier version which used octahedral (Oh) symmetry normals.
+
+coil_radius_m: 0.08          # 80 mm — surrounds the 100 mm sapphire sphere
+n_channels: 12
+max_current_a: 10.0
+slew_rate_a_per_ms: 150.0    # OFHC copper ribbon spec from domain report
+wire_turns: 100
+
+# Face-centre unit normals of a regular dodecahedron
+# = vertices of the dual regular icosahedron
+# (0, ±1, ±φ)/N and cyclic permutations, N = √(1+φ²) = 1.90211
+# φ = 1.61803,  1/N = 0.52573,  φ/N = 0.85065
+face_normals:
+  - [ 0.00000,  0.52573,  0.85065]
+  - [ 0.00000,  0.52573, -0.85065]
+  - [ 0.00000, -0.52573,  0.85065]
+  - [ 0.00000, -0.52573, -0.85065]
+  - [ 0.85065,  0.00000,  0.52573]
+  - [ 0.85065,  0.00000, -0.52573]
+  - [-0.85065,  0.00000,  0.52573]
+  - [-0.85065,  0.00000, -0.52573]
+  - [ 0.52573,  0.85065,  0.00000]
+  - [ 0.52573, -0.85065,  0.00000]
+  - [-0.52573,  0.85065,  0.00000]
+  - [-0.52573, -0.85065,  0.00000]
+
+biot_savart:
+  mesh_resolution: 64        # integration steps per coil loop

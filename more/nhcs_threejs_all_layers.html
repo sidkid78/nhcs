@@ -1,0 +1,243 @@
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#050510;overflow:hidden;}
+#c{width:100%;height:560px;position:relative;display:block;}
+canvas{position:absolute;top:0;left:0;width:100%!important;height:100%!important;}
+.lbl{position:absolute;pointer-events:none;transform:translate(-50%,-100%);text-align:center;text-shadow:0 0 12px currentColor;}
+.lbl-name{font:800 13px/1 -apple-system,sans-serif;letter-spacing:.06em;}
+.lbl-sub{font:600 10px/1 -apple-system,sans-serif;opacity:.65;margin-top:3px;}
+#ll1{color:#c4b5fd;} #ll2{color:#6ee7b7;} #ll3{color:#fcd34d;}
+.leg{position:absolute;bottom:12px;left:14px;display:flex;flex-direction:column;gap:5px;}
+.li{display:flex;align-items:center;gap:7px;font:600 10px -apple-system,sans-serif;color:rgba(255,255,255,.55);}
+.ld{width:7px;height:7px;border-radius:50%;}
+</style>
+<div id="c">
+  <div class="leg">
+    <div class="li"><div class="ld" style="background:#8b5cf6"></div>ConceptTarget (L1→L2)</div>
+    <div class="li"><div class="ld" style="background:#10b981"></div>PhysicalRealization (L2→L3)</div>
+    <div class="li"><div class="ld" style="background:#f59e0b"></div>IntegrationFeedback (L3→L1)</div>
+    <div class="li"><div class="ld" style="background:#94a3b8"></div>RetargetRequest (L3→L2)</div>
+  </div>
+  <div id="ll1" class="lbl"><div class="lbl-name">Layer 1</div><div class="lbl-sub">Genesis Core</div></div>
+  <div id="ll2" class="lbl"><div class="lbl-name">Layer 2</div><div class="lbl-sub">TMFT · Hopfion</div></div>
+  <div id="ll3" class="lbl"><div class="lbl-name">Layer 3</div><div class="lbl-sub">CRIM · Biometrics</div></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const cont = document.getElementById('c');
+let W = cont.offsetWidth, H = cont.offsetHeight;
+
+const renderer = new THREE.WebGLRenderer({antialias:true,alpha:false});
+renderer.setSize(W,H);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+cont.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x050510);
+scene.fog = new THREE.FogExp2(0x050510, 0.018);
+
+const camera = new THREE.PerspectiveCamera(52,W/H,0.1,300);
+camera.position.set(0,7,30);
+camera.lookAt(0,0,0);
+
+// ── positions & colours ──────────────────────────────────────────────────────
+const P1=new THREE.Vector3(-10,3,0), P2=new THREE.Vector3(0,0,0), P3=new THREE.Vector3(10,-3,0);
+const C1=0x8b5cf6, C2=0x10b981, C3=0xf59e0b;
+
+// ── stars ────────────────────────────────────────────────────────────────────
+{const n=1200,p=new Float32Array(n*3);for(let i=0;i<n*3;i++)p[i]=(Math.random()-.5)*160;
+const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(p,3));
+scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:.06,transparent:true,opacity:.5})));}
+
+// ── ambient + per-layer point lights ─────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0x1a1a33,.8));
+[[C1,P1],[C2,P2],[C3,P3]].forEach(([c,p])=>{const l=new THREE.PointLight(c,3,22);l.position.copy(p);scene.add(l);});
+
+// ── helper: disc platform ─────────────────────────────────────────────────────
+function addDisc(grp,r,col){
+  const m=new THREE.Mesh(new THREE.CircleGeometry(r,48),
+    new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.06,side:THREE.DoubleSide,depthWrite:false}));
+  m.rotation.x=Math.PI/2; grp.add(m);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(r,.025,4,64),
+    new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.25}));
+  ring.rotation.x=Math.PI/2; grp.add(ring);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAYER 1 – Genesis Core hypergraph
+// ═══════════════════════════════════════════════════════════════════════════════
+const g1=new THREE.Group(); g1.position.copy(P1); scene.add(g1);
+addDisc(g1,3,C1);
+
+const nodePos=[]; const nodeMesh=[];
+const nGeo=new THREE.SphereGeometry(.2,10,10);
+for(let i=0;i<16;i++){
+  const th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1);
+  const r=.6+Math.random()*2.2;
+  const p=new THREE.Vector3(r*Math.sin(ph)*Math.cos(th),r*Math.sin(ph)*Math.sin(th)*.75,r*Math.cos(ph));
+  nodePos.push(p);
+  const mat=new THREE.MeshStandardMaterial({color:C1,emissive:C1,emissiveIntensity:.6,roughness:.2,metalness:.7});
+  const m=new THREE.Mesh(nGeo,mat); m.position.copy(p);
+  m.userData={bp:p.clone(),phase:Math.random()*Math.PI*2}; nodeMesh.push(m); g1.add(m);
+}
+// edges
+const ep=[];
+for(let i=0;i<nodePos.length;i++)for(let j=i+1;j<nodePos.length;j++)
+  if(nodePos[i].distanceTo(nodePos[j])<2.8&&Math.random()>.35)
+    ep.push(...nodePos[i].toArray(),...nodePos[j].toArray());
+const eGeo=new THREE.BufferGeometry();
+eGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(ep),3));
+g1.add(new THREE.LineSegments(eGeo,new THREE.LineBasicMaterial({color:C1,transparent:true,opacity:.22})));
+// outer halo ring
+const halo1=new THREE.Mesh(new THREE.TorusGeometry(2.8,.015,4,80),
+  new THREE.MeshBasicMaterial({color:C1,transparent:true,opacity:.35}));
+halo1.rotation.x=.4; g1.add(halo1);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAYER 2 – TMFT / Hopfion (torus knot p=2,q=3)
+// ═══════════════════════════════════════════════════════════════════════════════
+const g2=new THREE.Group(); g2.position.copy(P2); scene.add(g2);
+addDisc(g2,4,C2);
+
+const tkGeo=new THREE.TorusKnotGeometry(2,.38,120,18,2,3);
+const tkMat=new THREE.MeshStandardMaterial({color:C2,emissive:C2,emissiveIntensity:.35,roughness:.15,metalness:.9});
+const tk=new THREE.Mesh(tkGeo,tkMat); g2.add(tk);
+g2.add(new THREE.Mesh(tkGeo,new THREE.MeshBasicMaterial({color:C2,wireframe:true,transparent:true,opacity:.12})));
+
+// sapphire sphere
+g2.add(new THREE.Mesh(new THREE.SphereGeometry(3.4,20,14),
+  new THREE.MeshBasicMaterial({color:0x60a5fa,wireframe:true,transparent:true,opacity:.07})));
+
+// magnetic field rings
+for(let i=0;i<6;i++){
+  const fr=new THREE.Mesh(new THREE.TorusGeometry(2.6+i*.15,.018,4,50),
+    new THREE.MeshBasicMaterial({color:C2,transparent:true,opacity:.18-i*.02}));
+  fr.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
+  g2.add(fr);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAYER 3 – CRIM / biometrics
+// ═══════════════════════════════════════════════════════════════════════════════
+const g3=new THREE.Group(); g3.position.copy(P3); scene.add(g3);
+addDisc(g3,3,C3);
+
+const bsMat=new THREE.MeshStandardMaterial({color:C3,emissive:C3,emissiveIntensity:.25,roughness:.4,metalness:.3,transparent:true,opacity:.72});
+g3.add(new THREE.Mesh(new THREE.SphereGeometry(1.6,28,28),bsMat));
+g3.add(new THREE.Mesh(new THREE.SphereGeometry(1.66,18,14),
+  new THREE.MeshBasicMaterial({color:C3,wireframe:true,transparent:true,opacity:.22})));
+
+// biometric pulse rings
+const rings=[];
+for(let i=0;i<3;i++){
+  const rm=new THREE.Mesh(new THREE.TorusGeometry(1,.03,4,50),
+    new THREE.MeshBasicMaterial({color:C3,transparent:true,opacity:.55}));
+  rm.rotation.x=Math.PI/2; rm.userData.ph=(i/3)*Math.PI*2; g3.add(rm); rings.push(rm);
+}
+// LSL waveform arc
+for(let i=0;i<2;i++){
+  const arc=new THREE.Mesh(new THREE.TorusGeometry(2+i*.4,.01,4,60,Math.PI*1.2),
+    new THREE.MeshBasicMaterial({color:C3,transparent:true,opacity:.25}));
+  arc.rotation.z=Math.PI*.1+i*.3; g3.add(arc);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BUS PARTICLES
+// ═══════════════════════════════════════════════════════════════════════════════
+function bez(p0,p1,p2,p3,t){
+  const u=1-t;
+  return new THREE.Vector3(
+    u*u*u*p0.x+3*u*u*t*p1.x+3*u*t*t*p2.x+t*t*t*p3.x,
+    u*u*u*p0.y+3*u*u*t*p1.y+3*u*t*t*p2.y+t*t*t*p3.y,
+    u*u*u*p0.z+3*u*u*t*p1.z+3*u*t*t*p2.z+t*t*t*p3.z
+  );
+}
+const channels=[
+  {f:P1,t:P2,c:C1, c1:new THREE.Vector3(-4,10,4),  c2:new THREE.Vector3(4,6,4),   spd:.0035},
+  {f:P2,t:P3,c:C2, c1:new THREE.Vector3(4,3,4),    c2:new THREE.Vector3(7,1,4),   spd:.0032},
+  {f:P3,t:P1,c:C3, c1:new THREE.Vector3(5,-10,-4), c2:new THREE.Vector3(-5,-6,-4),spd:.003},
+  {f:P3,t:P2,c:0x94a3b8,c1:new THREE.Vector3(7,-1,-3),c2:new THREE.Vector3(3,-1,-3),spd:.004},
+];
+const parts=[];
+const pGeo=new THREE.SphereGeometry(.13,4,4);
+channels.forEach(ch=>{
+  for(let i=0;i<14;i++){
+    const mat=new THREE.MeshBasicMaterial({color:ch.c,transparent:true,opacity:.95});
+    const m=new THREE.Mesh(pGeo,mat);
+    parts.push({m,ch,t:Math.random(),spd:ch.spd*(1+Math.random()*.4)});
+    scene.add(m);
+  }
+});
+
+// faint bezier trail lines
+channels.forEach(ch=>{
+  const pts=[];
+  for(let i=0;i<=40;i++) pts.push(bez(ch.f,ch.c1,ch.c2,ch.t,i/40));
+  const tg=new THREE.BufferGeometry().setFromPoints(pts);
+  scene.add(new THREE.Line(tg,new THREE.LineBasicMaterial({color:ch.c,transparent:true,opacity:.06})));
+});
+
+// ── label updater ─────────────────────────────────────────────────────────────
+const lbls=[
+  {el:document.getElementById('ll1'),wp:P1.clone().add(new THREE.Vector3(0,4.5,0))},
+  {el:document.getElementById('ll2'),wp:P2.clone().add(new THREE.Vector3(0,5,0))},
+  {el:document.getElementById('ll3'),wp:P3.clone().add(new THREE.Vector3(0,3.5,0))},
+];
+function updateLabels(){
+  lbls.forEach(({el,wp})=>{
+    const v=wp.clone().project(camera);
+    el.style.left=((v.x*.5+.5)*W)+'px';
+    el.style.top=((-v.y*.5+.5)*H)+'px';
+  });
+}
+
+// ── animate ───────────────────────────────────────────────────────────────────
+let t=0, camA=0;
+(function loop(){
+  requestAnimationFrame(loop);
+  t+=.01; camA+=.0025;
+
+  // camera slow orbit
+  camera.position.set(Math.sin(camA)*28*.6, 5+Math.sin(camA*.4)*4, Math.cos(camA)*28);
+  camera.lookAt(0,0,0);
+
+  // L1: nodes breathe + group rotates slowly
+  nodeMesh.forEach(n=>{
+    const ph=n.userData.phase;
+    n.position.x=n.userData.bp.x+Math.sin(t+ph)*.12;
+    n.position.y=n.userData.bp.y+Math.cos(t*.8+ph)*.12;
+    n.material.emissiveIntensity=.45+.4*Math.sin(t*2.2+ph);
+  });
+  g1.rotation.y=t*.09;
+  halo1.rotation.z=t*.05;
+
+  // L2: knot spins
+  tk.rotation.y=t*.45;
+  tk.rotation.x=t*.18;
+
+  // L3: biometric rings expand
+  rings.forEach(r=>{
+    const p=((t*.5+r.userData.ph/(Math.PI*2))%1);
+    const sc=1+p*3; r.scale.set(sc,1,sc);
+    r.material.opacity=.55*(1-p);
+  });
+
+  // bus particles
+  parts.forEach(p=>{
+    p.t=(p.t+p.spd)%1;
+    p.m.position.copy(bez(p.ch.f,p.ch.c1,p.ch.c2,p.ch.t,p.t));
+    const edge=Math.min(p.t,1-p.t)*8;
+    p.m.material.opacity=Math.min(edge,.9);
+  });
+
+  updateLabels();
+  renderer.render(scene,camera);
+})();
+
+window.addEventListener('resize',()=>{
+  W=cont.offsetWidth; H=cont.offsetHeight;
+  camera.aspect=W/H; camera.updateProjectionMatrix();
+  renderer.setSize(W,H);
+});
+</script>
