@@ -1,3 +1,7 @@
 
 # Gemini Agent
 .gemini-agent/cache/
+
+# Python bytecode cache
+__pycache__/
+*.py[cod]
