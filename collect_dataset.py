@@ -326,6 +326,16 @@ async def collect():
         for prime, count in Counter(primes).most_common(6):
             logger.info("  %-22s %d/%d", prime, count, len(rows))
 
+    # Return a summary so sweep drivers can aggregate without re-reading the CSV.
+    # `attempts` includes rejected candidates, so collected/attempts is the
+    # end-to-end pass-rate (AIAN + slashing + ICVP + airlock combined).
+    return {
+        "rows": rows,
+        "n_collected": len(rows),
+        "attempts": attempts,
+        "out_csv": str(OUT_CSV),
+    }
+
 
 if __name__ == "__main__":
     asyncio.run(collect())
