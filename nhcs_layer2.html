@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<!--
+  NHCS Layer 2 (TMFT Bridge) — standalone vanilla-JS port of "NHCS Layer 2.dc.html"
+  (Claude Design component, project 44a62185-eba4-4031-87b7-31539dbc57a5).
+
+  Scrollable detail page for Layer 2: Topological Magneto-Fluidic Translation —
+  four coupled physics solvers turning a target topological invariant into a
+  stable Hopfion field in a Fe3O4 chiral-nematic colloid. Hero field is rendered
+  as a true Hopf fibration (linked fibers, stereographic S3->R3), matching the
+  console. Self-running simulation; open in a browser (no build step).
+  Nav: OVERVIEW -> nhcs_console.html, L1/L3 -> nhcs_layer1/3.html.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NHCS · Layer 2 — TMFT Bridge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #070a0f; }
+  @keyframes nhcsPulse { 0%,100% { opacity:.35; } 50% { opacity:1; } }
+  .nhcs-scroll::-webkit-scrollbar { width: 7px; height: 7px; }
+  .nhcs-scroll::-webkit-scrollbar-track { background: transparent; }
+  .nhcs-scroll::-webkit-scrollbar-thumb { background: #243345; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div data-screen-label="Layer 2 — TMFT Bridge" style="--bg0:#070a0f;--bg1:#0c121b;--bg2:#111a26;--bg3:#16212f;--bd:#1d2a39;--bd2:#2a3c50;--tx:#cfdae8;--dim:#74879c;--faint:#3f4f61;--cy:#35e0cf;--bl:#48c6ff;--mg:#cf90f0;--gn:#5fe09a;--am:#f4c869;--rd:#ff6f7a; position:relative; min-height:100vh; background:var(--bg0); color:var(--tx); font-family:'Space Grotesk',system-ui,sans-serif;">
+
+  <div style="position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(120% 60% at 50% -10%, rgba(72,198,255,.08), transparent 60%);"></div>
+
+  <header style="position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:18px;padding:0 16px;height:52px;border-bottom:1px solid var(--bd);background:linear-gradient(180deg,#0c1320,#0a0f17);">
+    <div style="display:flex;align-items:center;gap:11px;">
+      <div style="position:relative;width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--bd2);border-radius:6px;background:var(--bg2);">
+        <div style="width:13px;height:13px;border:1.5px solid var(--bl);border-radius:50%;box-shadow:0 0 8px rgba(72,198,255,.6);"></div>
+        <div style="position:absolute;width:4px;height:4px;background:var(--bl);border-radius:50%;"></div>
+      </div>
+      <div style="line-height:1;">
+        <div style="font:700 14px/1 'Space Grotesk';letter-spacing:.04em;color:var(--tx);">NHCS<span style="color:var(--bl);"> ▸</span> <span style="color:var(--dim);font-weight:500;">CONSOLE</span></div>
+        <div style="margin-top:3px;font:500 8.5px/1 'IBM Plex Mono';letter-spacing:.22em;color:var(--faint);">NON-HUMAN CONCEPTUAL SYNTHESIS · v0.1.0</div>
+      </div>
+    </div>
+    <div style="height:26px;width:1px;background:var(--bd);"></div>
+    <nav style="display:flex;align-items:center;gap:3px;">
+      <a href="nhcs_console.html" style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.08em;padding:6px 10px;border-radius:5px;color:var(--dim);text-decoration:none;border:1px solid transparent;">OVERVIEW</a>
+      <a href="nhcs_layer1.html" style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.08em;padding:6px 10px;border-radius:5px;color:var(--dim);text-decoration:none;border:1px solid transparent;">L1 GENESIS</a>
+      <span style="font:600 10px/1 'IBM Plex Mono';letter-spacing:.08em;padding:6px 10px;border-radius:5px;background:rgba(72,198,255,.1);border:1px solid var(--bl);color:var(--bl);">L2 TMFT</span>
+      <a href="nhcs_layer3.html" style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.08em;padding:6px 10px;border-radius:5px;color:var(--dim);text-decoration:none;border:1px solid transparent;">L3 CRIM</a>
+    </nav>
+    <div style="flex:1;"></div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="width:8px;height:8px;border-radius:50%;background:var(--bl);box-shadow:0 0 9px var(--bl);animation:nhcsPulse 1.4s ease-in-out infinite;"></span>
+      <span id="phase-key" style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.14em;color:var(--bl);">COIL</span>
+    </div>
+  </header>
+
+  <!-- ============ HERO ============ -->
+  <div style="position:relative;z-index:1;display:grid;grid-template-columns:1.1fr 1fr;gap:26px;padding:34px 28px 8px;max-width:1360px;margin:0 auto;">
+    <div>
+      <div style="font:600 10px/1 'IBM Plex Mono';letter-spacing:.24em;color:var(--bl);margin-bottom:12px;">LAYER 2 · DIGITAL TWIN</div>
+      <h1 style="margin:0 0 14px;font:700 40px/1.08 'Space Grotesk';letter-spacing:-.01em;color:var(--tx);">TMFT Bridge</h1>
+      <p style="margin:0 0 10px;font:400 14.5px/1.65 'Space Grotesk';color:var(--dim);max-width:56ch;">Topological Magneto-Fluidic Translation — Hopfions realized in a chiral ferromagnetic-nematic colloid of Fe₃O₄ nanoparticles, inside a 50&nbsp;mm sapphire chamber driven by a 12-channel dodecahedral coil array. Four coupled solvers turn a target topological invariant into a stable, visible field.</p>
+      <p style="margin:0;font:400 12.5px/1.6 'IBM Plex Mono';color:var(--faint);max-width:60ch;">Real physical precedent exists — Hopfions have been observed in chiral magnets and ferromagnetic-nematic colloids. This is a multiphysics digital twin, not pure fiction.</p>
+    </div>
+    <div style="position:relative;background:radial-gradient(120% 120% at 50% 40%, #0d1622, #080c12);border:1px solid var(--bd);border-radius:12px;min-height:230px;overflow:hidden;">
+      <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(72,198,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(72,198,255,.05) 1px,transparent 1px);background-size:30px 30px;"></div>
+      <canvas id="l2-field" style="position:absolute;inset:0;width:100%;height:100%;"></canvas>
+      <div style="position:absolute;top:12px;left:14px;font:600 9px/1 'Space Grotesk';letter-spacing:.16em;color:var(--dim);text-transform:uppercase;">Hopfion Realization</div>
+      <div style="position:absolute;top:12px;right:14px;font:500 8.5px/1 'IBM Plex Mono';color:var(--am);padding:3px 7px;border:1px solid var(--bd2);border-radius:5px;background:rgba(8,14,22,.6);">Δ CHARGE <span id="err-str">2.1</span>%</div>
+      <div style="position:absolute;bottom:12px;left:14px;font:500 8.5px/1 'IBM Plex Mono';color:var(--faint);">50mm sapphire · Fe₃O₄ chiral nematic colloid</div>
+      <div style="position:absolute;bottom:12px;right:14px;font:500 8.5px/1 'IBM Plex Mono';color:var(--bl);" id="wl-badge">λ <span id="wl-str">520</span>nm</div>
+    </div>
+  </div>
+
+  <!-- ============ FOUR SOLVERS ============ -->
+  <div style="position:relative;z-index:1;padding:22px 28px 4px;max-width:1360px;margin:0 auto;">
+    <div style="font:600 10px/1 'Space Grotesk';letter-spacing:.2em;color:var(--dim);text-transform:uppercase;margin-bottom:11px;">Four Coupled Solvers</div>
+    <div id="solvers" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:12px;"></div>
+  </div>
+
+  <!-- ============ CONTROL MAP ============ -->
+  <div style="position:relative;z-index:1;padding:22px 28px 4px;max-width:1360px;margin:0 auto;">
+    <div style="background:var(--bg1);border:1px solid var(--bd);border-radius:10px;padding:16px 18px;">
+      <div style="font:600 10px/1 'Space Grotesk';letter-spacing:.18em;color:var(--dim);text-transform:uppercase;margin-bottom:14px;">Control Map</div>
+      <div id="control-map" style="display:flex;align-items:center;gap:0;overflow-x:auto;"></div>
+      <div style="margin-top:14px;font:400 11.5px/1.6 'Space Grotesk';color:var(--dim);max-width:90ch;">Genus-shifting (sphere → torus → double-torus) is the trickiest step: it's a topology change in the order parameter, modeled as an explicit defect-mediated transition rather than expected to emerge from a smooth solver.</div>
+    </div>
+  </div>
+
+  <!-- ============ LIVE GAUGES ============ -->
+  <div id="gauges" style="position:relative;z-index:1;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:22px 28px 4px;max-width:1360px;margin:0 auto;"></div>
+
+  <!-- ============ COIL ARRAY ============ -->
+  <div style="position:relative;z-index:1;padding:22px 28px 40px;max-width:1360px;margin:0 auto;">
+    <div style="background:var(--bg1);border:1px solid var(--bd);border-radius:10px;padding:16px 18px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <span style="font:600 10px/1 'Space Grotesk';letter-spacing:.18em;color:var(--dim);text-transform:uppercase;">12-Channel Dodecahedral Coil Array</span>
+        <span style="font:500 8.5px/1 'IBM Plex Mono';color:var(--faint);">nested tri-axial Helmholtz + Maxwell pairs + RF micro-coils</span>
+      </div>
+      <div id="coils" style="display:grid;grid-template-columns:repeat(12,1fr);gap:5px;height:70px;align-items:end;"></div>
+      <div style="margin-top:10px;font:400 11px/1.5 'Space Grotesk';color:var(--dim);">Adjoint / differentiable-physics optimization (JAX-MD, Warp, NVIDIA Modulus) inverts target Hopf field → per-channel currents each realization cycle.</div>
+    </div>
+
+    <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--bd);font:500 10px/1.6 'IBM Plex Mono';color:var(--faint);">
+      MILESTONE 2 · Layer 2 forward path at low fidelity — reduced-order Hopfion model on a 64³ grid, simplified 12-coil Biot–Savart field, hit target Hopf invariant within tolerance under 80–150 mPa·s viscosity. Success metric: achieved-vs-target Hopf charge error + reconfigure time.
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function () {
+  class Layer2 {
+    constructor() {
+      this.rng = this._mulberry(2042);
+      this._t = 0;
+      this.field = { rgb: [80, 200, 255], rgbT: [80, 200, 255], speed: 0.008, rot: 0, pulse: 16 };
+      this.state = { phaseKey: 'COIL', err: 2.1, wl: 520, freq: 24, valence: 0.1, arousal: 0.5, visc: 110, bfield: 60, coils: this._mkCoils() };
+    }
+    _mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+    _clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+    _esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    _mkCoils() { return Array.from({ length: 12 }, () => 20 + this.rng() * 75); }
+
+    mount() {
+      this._cacheDom();
+      this._renderStatic();
+      this._render();
+      this._timer = setInterval(() => this._tick(), 1000);
+      this._drawTimer = setInterval(() => this._draw(), 33);
+    }
+
+    _tick() {
+      const phases = ['COIL', 'LLG', 'QTENSOR', 'FLUID', 'PHOTONICS'];
+      const idx = (phases.indexOf(this.state.phaseKey) + 1) % phases.length;
+      const phaseKey = phases[idx];
+      const arousal = this._clamp(0.3 + this.rng() * 0.55, 0, 1);
+      const valence = this._clamp(this.rng() * 1.6 - 0.8, -0.95, 0.95);
+      const wl = Math.round(this._clamp(575 + valence * 150, 422, 718));
+      const freq = 15 + arousal * 24.5;
+      const err = 0.4 + this.rng() * 5.4;
+      const visc = 80 + this.rng() * 70;
+      const bfield = 40 + this.rng() * 90;
+      this.field.rgbT = this._wlRGB(wl);
+      Object.assign(this.state, { phaseKey, err, wl, freq, valence, arousal, visc, bfield, coils: this._mkCoils() });
+      this._render();
+    }
+
+    _wlRGB(w) {
+      let R = 0, G = 0, B = 0;
+      if (w < 440) { R = -(w - 440) / (440 - 380); B = 1; }
+      else if (w < 490) { G = (w - 440) / 50; B = 1; }
+      else if (w < 510) { G = 1; B = -(w - 510) / 20; }
+      else if (w < 580) { R = (w - 510) / 70; G = 1; }
+      else if (w < 645) { R = 1; G = -(w - 645) / 65; }
+      else { R = 1; }
+      let f = 1; if (w < 420) f = 0.3 + 0.7 * (w - 380) / 40; else if (w > 700) f = 0.3 + 0.7 * (780 - w) / 80;
+      const g = v => Math.round(255 * Math.pow(Math.max(0, v) * f, 0.8));
+      return [Math.max(40, g(R)), Math.max(40, g(G)), Math.max(40, g(B))];
+    }
+    _wlCss(w) { const c = this._wlRGB(w); return `rgb(${c[0]},${c[1]},${c[2]})`; }
+
+    // Real Hopf fibration: linked great-circle fibers, stereographic S3->R3,
+    // spun/tilted into view. Same render as the console's field.
+    _draw() {
+      const cv = document.getElementById('l2-field'); if (!cv) return;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return;
+      if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+      const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+      const f = this.field;
+      for (let i = 0; i < 3; i++) f.rgb[i] += (f.rgbT[i] - f.rgb[i]) * 0.04;
+      f.rot += f.speed;
+      const cx = w / 2, cy = h / 2;
+      const t = performance.now() / 1000;
+      const scale = Math.min(w, h) / 300;
+      const pr = f.rgb[0], pg = f.rgb[1], pb = f.rgb[2];
+      const P = 1, Q = 1;                          // Hopf charge (linking number)
+      const cS = Math.cos(f.rot), sS = Math.sin(f.rot);
+      const tilt = 0.62, ct = Math.cos(tilt), st = Math.sin(tilt);
+      const flow = t * 0.35;
+      const breathe = 1 + 0.05 * Math.sin(t * 2.0);
+      const projScale = (f.pulse * 0.9 + 20) * scale * 0.72 * breathe;
+      const lats = [0.50, 0.86, 1.22, 1.58, 1.94];
+      const nLat = lats.length, fibersPerLat = 8, seg = 84;
+      const fibers = [];
+      for (let li = 0; li < nLat; li++) {
+        const alpha = lats[li];
+        const ca = Math.cos(alpha / 2), sa = Math.sin(alpha / 2);
+        for (let bi = 0; bi < fibersPerLat; bi++) {
+          const beta = bi / fibersPerLat * Math.PI * 2;
+          const pts = []; let zsum = 0;
+          for (let s = 0; s <= seg; s++) {
+            const tt = s / seg * Math.PI * 2 + flow;
+            const a1 = P * tt, a2 = Q * tt + beta;
+            const z1re = ca * Math.cos(a1), z1im = ca * Math.sin(a1);
+            const z2re = sa * Math.cos(a2), z2im = sa * Math.sin(a2);
+            let denom = 1 - z2im; if (denom < 0.14) denom = 0.14;
+            const X = z1re / denom, Y = z1im / denom, Z = z2re / denom;
+            const x1 = X * cS - Z * sS, zR = X * sS + Z * cS;
+            const y1 = Y * ct - zR * st, z2 = Y * st + zR * ct;
+            pts.push([cx + x1 * projScale, cy + y1 * projScale, z2]);
+            zsum += z2;
+          }
+          fibers.push({ pts, z: zsum / (seg + 1), li, beta });
+        }
+      }
+      fibers.sort((a, b) => a.z - b.z);
+      for (const fb of fibers) {
+        const d = this._clamp((fb.z + 5) / 10, 0, 1);
+        const latT = nLat > 1 ? fb.li / (nLat - 1) : 0;
+        const tint = (0.55 + d * 0.55) * (0.72 + 0.36 * Math.cos(fb.beta + latT * 1.4));
+        const rC = Math.round(this._clamp(pr * tint + 16, 0, 255));
+        const gC = Math.round(this._clamp(pg * tint + 22, 0, 255));
+        const bC = Math.round(this._clamp(pb * tint + 28, 0, 255));
+        ctx.beginPath();
+        ctx.moveTo(fb.pts[0][0], fb.pts[0][1]);
+        for (let s = 1; s < fb.pts.length; s++) ctx.lineTo(fb.pts[s][0], fb.pts[s][1]);
+        ctx.strokeStyle = `rgba(${rC},${gC},${bC},${0.22 + d * 0.62})`;
+        ctx.lineWidth = (0.6 + d * 1.8) * scale;
+        ctx.lineJoin = 'round';
+        ctx.shadowBlur = d > 0.5 ? 6 * scale : 0;
+        ctx.shadowColor = `rgb(${rC},${gC},${bC})`;
+        ctx.stroke();
+      }
+      ctx.shadowBlur = 0;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 72 * scale);
+      g.addColorStop(0, `rgba(${Math.round(pr)},${Math.round(pg)},${Math.round(pb)},0.15)`);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, 72 * scale, 0, Math.PI * 2); ctx.fill();
+    }
+
+    renderVals() {
+      const s = this.state;
+      const solvers = [
+        { tag: '01', name: 'Coil-Field Solver', accent: 'var(--cy)',
+          desc: 'Magnetostatic/EM solve for the 12-ch dodecahedral array — spatial B-field as a function of the 12 channel currents.',
+          stack: 'COMSOL AC/DC · Radia · custom Biot–Savart + FEM' },
+        { tag: '02', name: 'Director / Magnetization', accent: 'var(--bl)',
+          desc: 'Q-tensor Landau–de Gennes for the nematic order, coupled with Landau–Lifshitz–Gilbert dynamics for the ferromagnetic moment.',
+          stack: 'MuMax3 (LLG) · FEniCS / custom FD (Q-tensor)' },
+        { tag: '03', name: 'Fluid Solver', accent: 'var(--mg)',
+          desc: 'Incompressible Navier–Stokes with active stress from the director field — predicts whether a target Hopf texture is stable in the viscosity window.',
+          stack: 'OpenFOAM · JAX-CFD' },
+        { tag: '04', name: 'Optical / Photonic Layer', accent: 'var(--am)',
+          desc: 'FDTD / transfer-matrix model of the magneto-photonic lattice mapping Valence to emission wavelength, 420–720nm.',
+          stack: 'Meep (FDTD) · transfer-matrix method' },
+      ];
+      const controlSteps = [
+        { top: 'c, b', bottom: 'crossing # · bridge idx' },
+        { top: 'p, q, g', bottom: 'torus params · genus' },
+        { top: 'Hopf map', bottom: 'target field, unit sphere' },
+        { top: 'Coil currents', bottom: 'adjoint / diff. physics' },
+        { top: 'Realized field', bottom: 'achieved Hopf charge' },
+      ].map((c, i, arr) => Object.assign({}, c, { hasNext: i < arr.length - 1 }));
+
+      const gauges = [
+        { label: 'VISCOSITY', range: '80–150 window', val: s.visc.toFixed(0), unit: 'mPa·s', col: 'var(--cy)', pct: ((s.visc - 80) / 70 * 100) },
+        { label: 'OSC FREQ', range: '1–60 Hz', val: s.freq.toFixed(1), unit: 'Hz', col: 'var(--bl)', pct: (s.freq / 60 * 100) },
+        { label: 'WAVELENGTH', range: '420–720 nm', val: String(s.wl), unit: 'nm', col: this._wlCss(s.wl), pct: ((s.wl - 420) / 300 * 100) },
+        { label: 'B-FIELD', range: 'coil envelope', val: s.bfield.toFixed(0), unit: 'mT', col: 'var(--gn)', pct: (s.bfield / 130 * 100) },
+      ];
+
+      return {
+        phaseKey: s.phaseKey,
+        errStr: s.err.toFixed(1), wlStr: String(s.wl), wlCol: this._wlCss(s.wl),
+        solvers, controlSteps, gauges,
+        coils: s.coils.map((h, i) => ({ h: h.toFixed(0), n: String(i + 1) })),
+      };
+    }
+
+    _cacheDom() {
+      const id = x => document.getElementById(x);
+      this.$ = {
+        phaseKey: id('phase-key'), errStr: id('err-str'), wlStr: id('wl-str'), wlBadge: id('wl-badge'),
+        solvers: id('solvers'), controlMap: id('control-map'), gauges: id('gauges'), coils: id('coils'),
+      };
+    }
+
+    _solverHTML(sv) {
+      return `
+      <div style="position:relative;background:var(--bg1);border:1px solid var(--bd);border-radius:10px;padding:15px 16px;overflow:hidden;">
+        <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:${sv.accent};"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span style="font:600 9px/1 'IBM Plex Mono';color:${sv.accent};padding:3px 6px;border:1px solid ${sv.accent};border-radius:4px;opacity:.85;">${this._esc(sv.tag)}</span>
+        </div>
+        <div style="font:600 14px/1.2 'Space Grotesk';color:var(--tx);margin-bottom:7px;">${this._esc(sv.name)}</div>
+        <div style="font:400 11.5px/1.55 'Space Grotesk';color:var(--dim);margin-bottom:10px;">${this._esc(sv.desc)}</div>
+        <div style="font:500 9px/1.5 'IBM Plex Mono';color:var(--faint);padding-top:9px;border-top:1px solid var(--bd);">${this._esc(sv.stack)}</div>
+      </div>`;
+    }
+    _controlHTML(cs) {
+      const arrow = cs.hasNext ? `
+        <div style="width:26px;height:1px;background:var(--bd2);position:relative;">
+          <div style="position:absolute;right:-1px;top:-3px;width:0;height:0;border-top:3px solid transparent;border-bottom:3px solid transparent;border-left:5px solid var(--bd2);"></div>
+        </div>` : '';
+      return `
+      <div style="display:flex;align-items:center;">
+        <div style="min-width:118px;text-align:center;padding:10px 12px;border:1px solid var(--bd2);border-radius:8px;background:var(--bg2);">
+          <div style="font:600 11.5px/1.3 'IBM Plex Mono';color:var(--bl);">${this._esc(cs.top)}</div>
+          <div style="margin-top:3px;font:500 8px/1.3 'IBM Plex Mono';color:var(--faint);">${this._esc(cs.bottom)}</div>
+        </div>${arrow}
+      </div>`;
+    }
+    _gaugeHTML(g) {
+      return `
+      <div style="background:var(--bg1);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font:600 9px/1 'IBM Plex Mono';letter-spacing:.1em;color:var(--dim);">${this._esc(g.label)}</span>
+          <span style="font:500 8px/1 'IBM Plex Mono';color:var(--faint);">${this._esc(g.range)}</span>
+        </div>
+        <div style="margin-top:8px;display:flex;align-items:baseline;gap:4px;">
+          <span style="font:600 22px/1 'IBM Plex Mono';color:${g.col};">${this._esc(g.val)}</span>
+          <span style="font:500 9px/1 'IBM Plex Mono';color:var(--faint);">${this._esc(g.unit)}</span>
+        </div>
+        <div style="margin-top:8px;height:5px;border-radius:3px;background:var(--bg3);overflow:hidden;">
+          <div style="height:100%;width:${this._clamp(g.pct, 0, 100)}%;background:${g.col};box-shadow:0 0 6px ${g.col};transition:width .3s;"></div>
+        </div>
+      </div>`;
+    }
+    _coilHTML(ch) {
+      return `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end;">
+        <div style="width:100%;height:${ch.h}%;background:linear-gradient(180deg,var(--bl),transparent);border-radius:2px 2px 0 0;opacity:.85;"></div>
+        <span style="font:500 7px/1 'IBM Plex Mono';color:var(--faint);">${this._esc(ch.n)}</span>
+      </div>`;
+    }
+
+    // Solvers and control map are static — render once.
+    _renderStatic() {
+      const v = this.renderVals();
+      this.$.solvers.innerHTML = v.solvers.map(sv => this._solverHTML(sv)).join('');
+      this.$.controlMap.innerHTML = v.controlSteps.map(cs => this._controlHTML(cs)).join('');
+    }
+
+    _render() {
+      const v = this.renderVals(), $ = this.$;
+      $.phaseKey.textContent = v.phaseKey;
+      $.errStr.textContent = v.errStr;
+      $.wlStr.textContent = v.wlStr;
+      $.wlBadge.style.color = v.wlCol;
+      $.gauges.innerHTML = v.gauges.map(g => this._gaugeHTML(g)).join('');
+      $.coils.innerHTML = v.coils.map(c => this._coilHTML(c)).join('');
+    }
+  }
+
+  const app = new Layer2();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => app.mount());
+  } else {
+    app.mount();
+  }
+  window.__nhcsL2 = app;
+})();
+</script>
+</body>
+</html>

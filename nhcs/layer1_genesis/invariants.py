@@ -65,6 +65,8 @@ class InvariantProfile(NamedTuple):
     persistence_pairs: list[PersistencePair]
     persistence_entropy: float
     complexity_score: float
+    # Rips cutoff the Betti numbers were read at (0.0 = unknown, e.g. stub path).
+    max_edge_length: float = 0.0
 
 
 def _adaptive_max_edge_length(points: np.ndarray, percentile: float = 20.0) -> float:
@@ -127,11 +129,16 @@ def _compute_betti_gudhi(
 
     rips = gudhi.RipsComplex(points=points.tolist(), max_edge_length=mel, sparse=sparse)
     simplex_tree = rips.create_simplex_tree(max_dimension=max_dimension + 1)
-    simplex_tree.compute_persistence()
-
+    # persistence_dim_max=True: without it GUDHI skips homology in the complex's
+    # top dimension, so a Rips complex with no triangles reports β1 = 0 (and one
+    # with no tetrahedra reports β2 = 0). Pairs above max_dimension are dropped
+    # so the result is unchanged whenever the old call was already correct.
+    # Note: SimplexTree.persistence() recomputes with its own arguments, so the
+    # flag must be passed here (a prior compute_persistence() call is overridden).
     pairs: list[PersistencePair] = []
-    for dim, (birth, death) in simplex_tree.persistence():
-        pairs.append(PersistencePair(dim, birth, death))
+    for dim, (birth, death) in simplex_tree.persistence(persistence_dim_max=True):
+        if dim <= max_dimension:
+            pairs.append(PersistencePair(dim, birth, death))
 
     raw_betti = list(simplex_tree.betti_numbers())
 
@@ -154,7 +161,7 @@ def _compute_betti_gudhi(
         len(points), points.shape[1] if points.ndim > 1 else 1,
         mel, sparse, betti, score,
     )
-    return InvariantProfile(betti, euler, dimension, pairs, entropy, score)
+    return InvariantProfile(betti, euler, dimension, pairs, entropy, score, mel)
 
 
 def _compute_betti_stub(points: np.ndarray, max_dimension: int) -> InvariantProfile:
@@ -219,3 +226,19 @@ def topological_complexity_score(
     else:
         persistence_score = 0.0
     return betti_score + persistence_score
+
+
+def betti_at_scale(
+    pairs: list[PersistencePair], scale: float, max_dimension: int = 2,
+) -> list[int]:
+    """
+    Persistent Betti numbers at filtration value ``scale``: the number of
+    features with birth <= scale < death in each dimension.
+
+    At ``scale = profile.max_edge_length`` this reproduces ``profile.betti``.
+    """
+    betti = [0] * (max_dimension + 1)
+    for p in pairs:
+        if p.dimension <= max_dimension and p.birth <= scale < p.death:
+            betti[p.dimension] += 1
+    return betti

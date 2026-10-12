@@ -31,6 +31,8 @@ class ValidatorNode:
         Minimum algorithmic parsimony required for approval.
     noise_std : float
         Simulated measurement noise on merit scores (models disagreement).
+    persistence_gate : "log_only" | "blocking"
+        Passed to MeritEvaluator: whether topological robustness counts toward Et.
     """
 
     def __init__(
@@ -39,12 +41,13 @@ class ValidatorNode:
         et_threshold: float = 0.50,
         ap_threshold: float = 0.00,
         noise_std: float = 0.03,
+        persistence_gate: str = "log_only",
     ) -> None:
         self.did = did or f"did:nhcs:{uuid.uuid4().hex[:12]}"
         self.et_threshold = et_threshold
         self.ap_threshold = ap_threshold
         self.noise_std = noise_std
-        self._evaluator = MeritEvaluator()
+        self._evaluator = MeritEvaluator(persistence_gate=persistence_gate)
 
     def evaluate(
         self,

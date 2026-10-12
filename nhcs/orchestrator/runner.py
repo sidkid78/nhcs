@@ -55,6 +55,13 @@ class EndToEndRunner:
         Keyword arguments for the AIAN discriminator (e.g. ``novelty_threshold``,
         ``head_weights``, ``encoder_model``), typically the ``layer1.aian`` block
         from the YAML config. Unknown keys are ignored. ``None`` → AIAN defaults.
+    rse_config   : dict, optional
+        The ``layer1.rse`` block: ``mode`` ("mro" | "pushout") and, for pushout
+        mode, a ``pushout`` sub-dict of PushoutGenerator settings.
+    icvp_config  : dict, optional
+        The ``layer1.icvp`` block: ``et_threshold``, ``ap_threshold`` and
+        ``persistence_gate`` are passed to every ValidatorNode (and the gate to
+        the orchestrator's MeritEvaluator). Unknown keys are ignored.
     """
 
     def __init__(
@@ -66,21 +73,30 @@ class EndToEndRunner:
         grid_size: int = 16,
         rse_n_seeds: int = 20,
         aian_config: dict | None = None,
+        icvp_config: dict | None = None,
+        rse_config: dict | None = None,
     ) -> None:
         # Layer 1
         self.rse = RecursiveSynthesisEngine(
             n_seed_complexes=rse_n_seeds,
             rng_seed=rng_seed,
+            mode=(rse_config or {}).get("mode", "mro"),
+            pushout_config=(rse_config or {}).get("pushout"),
         )
         # Keep only kwargs AIAN actually accepts, so extra config keys don't break it.
         _aian_kwargs = {
             k: v for k, v in (aian_config or {}).items()
-            if k in ("novelty_threshold", "encoder_model", "head_weights")
+            if k in ("novelty_threshold", "encoder_model", "head_weights", "gate")
         }
         self.aian = AIAN(**_aian_kwargs)
         self.beam = DivergentBeamSearch(beam_width=3)
-        self.merit = MeritEvaluator()
-        self.validators = [ValidatorNode() for _ in range(n_validators)]
+        _node_kwargs = {
+            k: v for k, v in (icvp_config or {}).items()
+            if k in ("et_threshold", "ap_threshold", "persistence_gate")
+        }
+        self.merit = MeritEvaluator(
+            persistence_gate=_node_kwargs.get("persistence_gate", "log_only"))
+        self.validators = [ValidatorNode(**_node_kwargs) for _ in range(n_validators)]
         self.consensus = ConsensusProtocol(n_validators=n_validators)
         self.ledger = GlobalKnowledgeLedger(ledger_path)
         self.slashing = SlashingDetector()
@@ -172,9 +188,9 @@ class EndToEndRunner:
         )
 
         field_tensors = realization.field_tensor_array()
-        spatial_3d, temporal, magnitude = self.phen.project_full(field_tensors)
+        spatial_3d, temporal, magnitude, variability = self.phen.project_full(field_tensors)
         initial_primes = [(r.prime, r.weight) for r in
-                          self.mapper.map(spatial_3d, temporal, magnitude)]
+                          self.mapper.map(spatial_3d, temporal, magnitude, variability)]
 
         cli_series, iis_series = [], []
         hrv_series, gsr_series, pupil_series = [], [], []
@@ -196,7 +212,7 @@ class EndToEndRunner:
             pupil_series.append(sample.pupil_diameter_mm)
 
         final_primes = [(r.prime, r.weight) for r in
-                        self.mapper.map(spatial_3d, temporal, magnitude * iis)]
+                        self.mapper.map(spatial_3d, temporal, magnitude * iis, variability)]
         bhi = biometric_homeostasis_index(hrv_series, gsr_series, pupil_series)
         sdr, sdr_conf = semantic_distance_reduction(initial_primes, final_primes)
 

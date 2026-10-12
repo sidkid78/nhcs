@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<!--
+  NHCS Console — standalone vanilla-JS port of "NHCS Console.dc.html"
+  (Claude Design component, project 44a62185-eba4-4031-87b7-31539dbc57a5).
+
+  A real-time, self-running visualization of the NHCS pipeline:
+    L1 Genesis Core  ->  L2 TMFT Bridge  ->  L3 CRIM Model  -> feedback
+  The pipeline here is a deterministic simulation (mulberry32 seed 42) that
+  mirrors the message-bus phases of the actual three-layer prototype. No build
+  step or server required: open this file in a browser.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NHCS Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #070a0f; }
+  @keyframes nhcsPulse { 0%,100% { opacity:.35; } 50% { opacity:1; } }
+  @keyframes nhcsBlink { 0%,49% { opacity:1; } 50%,100% { opacity:.15; } }
+  @keyframes nhcsFlow { to { stroke-dashoffset: -16; } }
+  .nhcs-scroll::-webkit-scrollbar { width: 7px; height: 7px; }
+  .nhcs-scroll::-webkit-scrollbar-track { background: transparent; }
+  .nhcs-scroll::-webkit-scrollbar-thumb { background: #243345; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="nhcs-root" data-screen-label="NHCS Console" style="--bg0:#070a0f;--bg1:#0c121b;--bg2:#111a26;--bg3:#16212f;--bd:#1d2a39;--bd2:#2a3c50;--tx:#cfdae8;--dim:#74879c;--faint:#3f4f61;--cy:#35e0cf;--bl:#48c6ff;--mg:#cf90f0;--gn:#5fe09a;--am:#f4c869;--rd:#ff6f7a; position:relative; display:grid; grid-template-rows:52px minmax(0,1fr) 124px; height:100vh; min-height:820px; background:var(--bg0); color:var(--tx); font-family:'Space Grotesk',system-ui,sans-serif; overflow:hidden;">
+
+  <!-- scanline overlay -->
+  <div id="scanline" style="position:absolute;inset:0;pointer-events:none;z-index:40;mix-blend-mode:overlay;background:repeating-linear-gradient(0deg, rgba(120,200,255,.05) 0px, rgba(120,200,255,.05) 1px, transparent 1px, transparent 3px);opacity:.5;"></div>
+  <div style="position:absolute;inset:0;pointer-events:none;z-index:41;background:radial-gradient(120% 80% at 50% -10%, rgba(53,224,207,.06), transparent 60%);"></div>
+
+  <!-- ============ HEADER ============ -->
+  <header style="position:relative;z-index:30;display:flex;align-items:center;gap:18px;padding:0 16px;border-bottom:1px solid var(--bd);background:linear-gradient(180deg,#0c1320,#0a0f17);">
+    <div style="display:flex;align-items:center;gap:11px;">
+      <div style="position:relative;width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--bd2);border-radius:6px;background:var(--bg2);">
+        <div style="width:13px;height:13px;border:1.5px solid var(--cy);border-radius:50%;box-shadow:0 0 8px rgba(53,224,207,.6);"></div>
+        <div style="position:absolute;width:4px;height:4px;background:var(--cy);border-radius:50%;"></div>
+      </div>
+      <div style="line-height:1;">
+        <div style="font:700 14px/1 'Space Grotesk';letter-spacing:.04em;color:var(--tx);">NHCS<span style="color:var(--cy);"> ▸</span> <span style="color:var(--dim);font-weight:500;">CONSOLE</span></div>
+        <div style="margin-top:3px;font:500 8.5px/1 'IBM Plex Mono';letter-spacing:.22em;color:var(--faint);">NON-HUMAN CONCEPTUAL SYNTHESIS · v0.1.0</div>
+      </div>
+    </div>
+
+    <div style="height:26px;width:1px;background:var(--bd);"></div>
+
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span id="status-dot" style="width:8px;height:8px;border-radius:50%;background:var(--gn);box-shadow:0 0 9px var(--gn);animation:nhcsPulse 1.4s ease-in-out infinite;"></span>
+      <span id="status-label" style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.14em;color:var(--gn);">RUNNING</span>
+    </div>
+
+    <div style="display:flex;align-items:baseline;gap:6px;font-family:'IBM Plex Mono';">
+      <span style="font-size:8px;letter-spacing:.18em;color:var(--faint);">T+</span>
+      <span id="elapsed" style="font-size:13px;color:var(--tx);font-weight:500;">00:00.0</span>
+    </div>
+
+    <div style="flex:1;"></div>
+
+    <div style="display:flex;align-items:center;gap:14px;font-family:'IBM Plex Mono';">
+      <div style="text-align:right;line-height:1.1;"><div id="src-key" style="font-size:8px;letter-spacing:.16em;color:var(--faint);">SEED</div><div id="src-val" style="font-size:12px;color:var(--dim);">42</div></div>
+      <div style="text-align:right;line-height:1.1;"><div style="font-size:8px;letter-spacing:.16em;color:var(--faint);">COMMITTED</div><div id="committed" style="font-size:12px;color:var(--cy);">0</div></div>
+      <div style="text-align:right;line-height:1.1;"><div style="font-size:8px;letter-spacing:.16em;color:var(--faint);">ATTEMPTS</div><div id="attempts" style="font-size:12px;color:var(--dim);">0</div></div>
+      <div style="text-align:right;line-height:1.1;"><div style="font-size:8px;letter-spacing:.16em;color:var(--faint);">THRPUT</div><div id="thrput" style="font-size:12px;color:var(--dim);">0.0/min</div></div>
+    </div>
+
+    <div style="height:26px;width:1px;background:var(--bd);"></div>
+
+    <div style="display:flex;align-items:center;gap:7px;">
+      <button id="btn-toggle" style="display:flex;align-items:center;gap:7px;height:30px;padding:0 14px;border:1px solid var(--cy);border-radius:6px;background:rgba(53,224,207,.1);color:var(--cy);font:600 11px/1 'IBM Plex Mono';letter-spacing:.1em;cursor:pointer;">❚❚ PAUSE</button>
+      <button id="btn-step" title="Step one phase" style="display:grid;place-items:center;width:30px;height:30px;border:1px solid var(--bd2);border-radius:6px;background:var(--bg2);color:var(--dim);font:600 13px/1 'IBM Plex Mono';cursor:pointer;">⏭</button>
+      <button id="btn-reset" title="Reset run" style="display:grid;place-items:center;width:30px;height:30px;border:1px solid var(--bd2);border-radius:6px;background:var(--bg2);color:var(--dim);font:600 12px/1 'IBM Plex Mono';cursor:pointer;">⟲</button>
+    </div>
+  </header>
+
+  <!-- ============ BODY ============ -->
+  <div style="position:relative;z-index:20;display:grid;grid-template-columns:288px minmax(0,1fr) 326px;gap:10px;padding:10px;min-height:0;overflow:hidden;">
+
+    <!-- ---- LEFT: PIPELINE ---- -->
+    <div class="nhcs-scroll" style="display:flex;flex-direction:column;gap:9px;min-height:0;overflow:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px;">
+        <span style="font:600 10px/1 'Space Grotesk';letter-spacing:.18em;color:var(--dim);text-transform:uppercase;">Pipeline</span>
+        <span style="font:500 9px/1 'IBM Plex Mono';letter-spacing:.1em;color:var(--faint);">CONCEPT <span id="cur-id">—</span></span>
+      </div>
+
+      <div id="pipeline" style="display:flex;flex-direction:column;gap:9px;"></div>
+
+      <div style="flex:1;min-height:8px;"></div>
+      <div style="background:var(--bg1);border:1px solid var(--bd);border-radius:9px;padding:10px 12px;">
+        <div style="font:600 9px/1 'Space Grotesk';letter-spacing:.16em;color:var(--dim);text-transform:uppercase;margin-bottom:9px;">Loop Integrity</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
+          <span style="width:7px;height:7px;border-radius:50%;background:var(--gn);box-shadow:0 0 7px var(--gn);"></span>
+          <span style="font:500 9.5px/1 'IBM Plex Mono';color:var(--dim);">PhysicalRealization airlock</span>
+          <span style="margin-left:auto;font:600 9.5px/1 'IBM Plex Mono';color:var(--gn);">SEALED</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="width:7px;height:7px;border-radius:50%;background:var(--am);box-shadow:0 0 7px var(--am);"></span>
+          <span style="font:500 9.5px/1 'IBM Plex Mono';color:var(--dim);">Slashing detector</span>
+          <span style="margin-left:auto;font:600 9.5px/1 'IBM Plex Mono';color:var(--am);">ARMED</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- CENTER ---- -->
+    <div style="display:flex;flex-direction:column;gap:10px;min-height:0;min-width:0;">
+      <!-- KPI strip -->
+      <div id="kpis" class="nhcs-scroll" style="flex:none;display:flex;gap:8px;overflow-x:auto;padding-bottom:1px;"></div>
+
+      <!-- Hopfion field -->
+      <div style="position:relative;flex:1 1 0;background:radial-gradient(120% 120% at 50% 40%, #0d1622, #080c12);border:1px solid var(--bd);border-radius:11px;overflow:hidden;min-height:158px;">
+        <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(72,198,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(72,198,255,.05) 1px,transparent 1px);background-size:34px 34px;pointer-events:none;"></div>
+        <canvas id="nhcs-field" style="position:absolute;inset:0;width:100%;height:100%;"></canvas>
+
+        <div style="position:absolute;top:12px;left:14px;line-height:1.3;">
+          <div style="font:600 9px/1 'Space Grotesk';letter-spacing:.18em;color:var(--dim);text-transform:uppercase;">Hopfion Realization</div>
+          <div style="margin-top:4px;font:500 8.5px/1 'IBM Plex Mono';color:var(--faint);">TMFT · 50mm sapphire · 12-ch dodec</div>
+        </div>
+        <div style="position:absolute;top:12px;right:14px;display:flex;gap:7px;">
+          <span style="font:500 8.5px/1 'IBM Plex Mono';letter-spacing:.06em;color:var(--bl);padding:3px 7px;border:1px solid var(--bd2);border-radius:5px;background:rgba(8,14,22,.6);">CHARGE <span id="charge">—</span></span>
+          <span style="font:500 8.5px/1 'IBM Plex Mono';letter-spacing:.06em;color:var(--am);padding:3px 7px;border:1px solid var(--bd2);border-radius:5px;background:rgba(8,14,22,.6);">Δ <span id="err-top">—</span></span>
+        </div>
+
+        <div style="position:absolute;left:14px;bottom:12px;display:flex;gap:18px;">
+          <div style="line-height:1.25;"><div style="font:500 8px/1 'IBM Plex Mono';letter-spacing:.12em;color:var(--faint);">OSC FREQ</div><div style="margin-top:4px;font:600 15px/1 'IBM Plex Mono';color:var(--cy);"><span id="freq">—</span><span style="font-size:9px;color:var(--faint);"> Hz</span></div></div>
+          <div style="line-height:1.25;"><div style="font:500 8px/1 'IBM Plex Mono';letter-spacing:.12em;color:var(--faint);">WAVELENGTH</div><div style="margin-top:4px;font:600 15px/1 'IBM Plex Mono';color:var(--tx);"><span id="wl-field">—</span><span style="font-size:9px;color:var(--faint);"> nm</span></div></div>
+          <div style="line-height:1.25;"><div style="font:500 8px/1 'IBM Plex Mono';letter-spacing:.12em;color:var(--faint);">VALENCE</div><div style="margin-top:4px;font:600 15px/1 'IBM Plex Mono';color:var(--tx);" id="valence">—</div></div>
+          <div style="line-height:1.25;"><div style="font:500 8px/1 'IBM Plex Mono';letter-spacing:.12em;color:var(--faint);">AROUSAL</div><div style="margin-top:4px;font:600 15px/1 'IBM Plex Mono';color:var(--tx);" id="arousal">—</div></div>
+        </div>
+        <div style="position:absolute;right:14px;bottom:12px;text-align:right;line-height:1.25;">
+          <div style="font:500 8px/1 'IBM Plex Mono';letter-spacing:.12em;color:var(--faint);">B-FIELD</div>
+          <div style="margin-top:4px;font:600 15px/1 'IBM Plex Mono';color:var(--bl);"><span id="bfield">—</span><span style="font-size:9px;color:var(--faint);"> mT</span></div>
+        </div>
+      </div>
+
+      <!-- charts row -->
+      <div style="flex:none;display:grid;grid-template-columns:1fr 1fr;gap:10px;height:132px;">
+        <div style="position:relative;background:var(--bg1);border:1px solid var(--bd);border-radius:9px;padding:10px 12px 6px;display:flex;flex-direction:column;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span style="font:600 9px/1 'Space Grotesk';letter-spacing:.16em;color:var(--dim);text-transform:uppercase;">CRIM Closed Loop</span>
+            <div style="display:flex;gap:11px;font:500 8.5px/1 'IBM Plex Mono';">
+              <span style="color:var(--cy);">● CLI</span><span style="color:var(--mg);">● IIS</span><span style="color:var(--rd);">┄ FLOW 0.60</span>
+            </div>
+          </div>
+          <svg viewBox="0 0 300 100" preserveAspectRatio="none" style="flex:1;width:100%;min-height:0;">
+            <line x1="0" y1="45" x2="300" y2="45" stroke="var(--rd)" stroke-width="1" stroke-dasharray="3 3" opacity=".55"></line>
+            <polyline id="iis-line" points="" fill="none" stroke="var(--mg)" stroke-width="1.6" opacity=".9"></polyline>
+            <polyline id="cli-line" points="" fill="none" stroke="var(--cy)" stroke-width="1.8"></polyline>
+          </svg>
+          <div style="display:flex;justify-content:space-between;font:500 7.5px/1 'IBM Plex Mono';color:var(--faint);padding-top:3px;">
+            <span>CLI pinned ≈ <span id="cli-now">0.000</span> · below flow target</span><span><span id="steps">0</span> steps</span>
+          </div>
+        </div>
+
+        <div style="position:relative;background:var(--bg1);border:1px solid var(--bd);border-radius:9px;padding:10px 12px 8px;display:flex;flex-direction:column;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <span style="font:600 9px/1 'Space Grotesk';letter-spacing:.16em;color:var(--dim);text-transform:uppercase;">Emission Spectrum</span>
+            <span style="font:500 8.5px/1 'IBM Plex Mono';color:var(--faint);">420 – 720 nm</span>
+          </div>
+          <div style="position:relative;flex:1;min-height:0;border-radius:5px;overflow:hidden;background:linear-gradient(90deg,#5b2fd0,#3c6cff,#2fd6e0,#5fe07a,#f3d24a,#ff8a3c,#ff4a4a);">
+            <div style="position:absolute;inset:0;background:rgba(8,12,18,.62);"></div>
+            <svg viewBox="0 0 300 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;">
+              <polyline id="spec-line" points="" fill="none" stroke="#ffffff" stroke-width="1.6" opacity=".92"></polyline>
+            </svg>
+            <div id="spec-marker" style="position:absolute;top:0;bottom:0;width:2px;background:#fff;box-shadow:0 0 8px #fff;left:50%;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font:500 7.5px/1 'IBM Plex Mono';color:var(--faint);padding-top:5px;">
+            <span>λ peak <span id="wl-peak">—</span> nm</span><span>≤ 60 Hz pulse</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- RIGHT ---- -->
+    <div style="display:grid;grid-template-rows:auto minmax(0,1fr);gap:11px;min-height:0;">
+      <!-- ICVP -->
+      <div style="background:var(--bg1);border:1px solid var(--bd);border-radius:9px;padding:11px 12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <span style="font:600 10px/1 'Space Grotesk';letter-spacing:.16em;color:var(--dim);text-transform:uppercase;">ICVP Consensus</span>
+          <span id="cons-label" style="font:600 9px/1 'IBM Plex Mono';color:var(--faint);padding:3px 6px;border:1px solid var(--faint);border-radius:4px;">IDLE</span>
+        </div>
+        <div style="position:relative;height:8px;border-radius:5px;background:var(--bg3);overflow:hidden;margin-bottom:5px;">
+          <div id="cons-bar" style="height:100%;width:0%;background:var(--faint);box-shadow:0 0 9px var(--faint);transition:width .35s;"></div>
+          <div style="position:absolute;top:-2px;bottom:-2px;left:66%;width:2px;background:var(--am);opacity:.85;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font:500 8px/1 'IBM Plex Mono';color:var(--faint);margin-bottom:10px;">
+          <span><span id="cons-pct">0/5</span> approve</span><span style="color:var(--am);">▲ 66% supermajority · PoU</span>
+        </div>
+        <div id="validators" style="display:flex;flex-direction:column;gap:5px;"></div>
+      </div>
+
+      <!-- Ledger -->
+      <div style="display:flex;flex-direction:column;background:var(--bg1);border:1px solid var(--bd);border-radius:9px;min-height:0;overflow:hidden;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 12px 9px;border-bottom:1px solid var(--bd);">
+          <span style="font:600 10px/1 'Space Grotesk';letter-spacing:.16em;color:var(--dim);text-transform:uppercase;">Global Knowledge Ledger</span>
+          <span style="font:500 8.5px/1 'IBM Plex Mono';color:var(--faint);"><span id="ledger-count">0</span> blocks</span>
+        </div>
+        <div style="display:grid;grid-template-columns:16px 1fr 52px 44px 44px;gap:8px;padding:7px 12px;font:500 7.5px/1 'IBM Plex Mono';letter-spacing:.08em;color:var(--faint);border-bottom:1px solid var(--bd);">
+          <span></span><span>CONCEPT · β-PROFILE</span><span style="text-align:right;">NOV</span><span style="text-align:right;">SDR</span><span style="text-align:right;">BHI</span>
+        </div>
+        <div id="ledger" class="nhcs-scroll" style="flex:1;min-height:0;overflow:auto;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ FOOTER: EVENT STREAM ============ -->
+  <footer style="position:relative;z-index:30;display:flex;flex-direction:column;border-top:1px solid var(--bd);background:linear-gradient(180deg,#0a0f17,#080c12);min-height:0;">
+    <div style="display:flex;align-items:center;gap:9px;padding:7px 16px 5px;">
+      <span style="width:6px;height:6px;border-radius:50%;background:var(--rd);animation:nhcsBlink 1.1s steps(1) infinite;"></span>
+      <span style="font:600 9px/1 'Space Grotesk';letter-spacing:.18em;color:var(--dim);text-transform:uppercase;">Event Stream</span>
+      <span style="font:500 8px/1 'IBM Plex Mono';color:var(--faint);">bus · L1↔L2↔L3 · record/replay</span>
+      <span id="phase-banner" style="margin-left:auto;font:500 8px/1 'IBM Plex Mono';color:var(--faint);"></span>
+    </div>
+    <div id="log" class="nhcs-scroll" style="flex:1;min-height:0;overflow:hidden;padding:0 16px 8px;"></div>
+  </footer>
+</div>
+
+<script>
+"use strict";
+(function () {
+  // ------------------------------------------------------------------
+  //  NHCSConsole — port of the DCLogic Component class. State lives in a
+  //  plain object; setState merges a patch then re-renders the dynamic
+  //  regions by id (the canvas element persists across renders).
+  // ------------------------------------------------------------------
+  class NHCSConsole {
+    constructor(props) {
+      this.props = Object.assign({ simSpeed: 1, scanlines: true, fieldRings: 7 }, props || {});
+      this.rng = this._mulberry(42);
+      this.PHASES = [
+        { key:'RSE',    layer:'L1', mod:'rse',    tag:'L1', msg:()=>`RSE · synthesizing seed complexes (β-width 3)` },
+        { key:'AIAN',   layer:'L1', mod:'aian',   tag:'L1', msg:(c)=>`AIAN · novelty=${c.novelty.toFixed(3)} gate=0.60 → ${c.rejected?'REJECT (starve)':'PASS'}` },
+        { key:'BEAM',   layer:'L1', mod:'beam',   tag:'L1', msg:()=>`Divergent beam search · structural-distance select` },
+        { key:'MERIT',  layer:'L1', mod:'merit',  tag:'L1', msg:(c)=>`Merit · MDL + edge-of-chaos · cmplx=${c.cmplx.toFixed(2)}` },
+        { key:'SLASH',  layer:'L1', mod:'icvp',   tag:'L1', msg:()=>`Slashing detector · no human-in-loop signature · clean` },
+        { key:'ICVP',   layer:'L1', mod:'icvp',   tag:'L1', msg:(c)=>`ICVP · ${c.consN}/5 validators approve (${c.consApprove?'>66% COMMIT':'<66% DROP'})` },
+        { key:'COMMIT', layer:'L1', mod:'ledger', tag:'L1', msg:(c)=>`Ledger · block committed did:nhcs:orchestrator β=[${c.betti.join(',')}]` },
+        { key:'L2_COIL',layer:'L2', mod:'coil',   tag:'L2', msg:()=>`Coil array · 12-ch dodecahedral Biot–Savart field solved` },
+        { key:'L2_LLG', layer:'L2', mod:'llg',    tag:'L2', msg:()=>`LLG · Fe₃O₄ magnetization relaxed (mumax3)` },
+        { key:'L2_QT',  layer:'L2', mod:'qtensor',tag:'L2', msg:()=>`Q-tensor · nematic director field stable` },
+        { key:'L2_FLU', layer:'L2', mod:'fluid',  tag:'L2', msg:(c)=>`Navier–Stokes · texture stable in ${c.visc} mPa·s window` },
+        { key:'L2_PHOT',layer:'L2', mod:'phot',   tag:'L2', msg:(c)=>`Photonics · λ=${c.wl}nm @ ${c.freq.toFixed(1)}Hz · Δcharge ${c.err.toFixed(1)}%` },
+        { key:'L3_PROJ',layer:'L3', mod:'phen',   tag:'L3', msg:()=>`Phen-space · Hopf field → 65 NSM primes + metaphor table` },
+        { key:'L3_LOOP',layer:'L3', mod:'pid',    tag:'L3', msg:(c)=>`CRIM loop · PID→CLI ${c.cli.toFixed(3)} (target 0.60) · vignetting` },
+        { key:'FEEDBACK',layer:'L3',mod:'metrics',tag:'L3', msg:(c)=>`Feedback → L1 · BHI=${c.bhi.toFixed(3)} SDR=${c.sdr.toFixed(3)} priors updated` },
+      ];
+      this.L3_STEPS = 22;
+      // data source: 'SIM' = deterministic RNG generator; 'REPLAY' = real
+      // rows loaded from a data/nhcs_run_*.csv produced by collect_dataset.py.
+      this.mode = 'SIM';
+      this._rows = null;
+      this._rowIdx = 0;
+      this._runName = 'seed 42';
+      this.cur = this._makeConcept();
+      this.field = { rgb:[80,200,200], rgbT:[80,200,200], speed:0.006, speedT:0.006, rings:7, pulse:18, pulseT:18, rot:0, p:1, q:1 };
+      this._to = null;
+      this.state = {
+        running:true, tick:0, elapsed:0,
+        phaseIdx:-1, phaseKey:'', activeLayer:'', activeMod:'',
+        cli:[], iis:[], spec:this._spectrum(610),
+        cur:this.cur,
+        validators:this._blankValidators(),
+        consN:0, consPct:0, consApprove:false,
+        ledger:[], log:[],
+        attempts:0, accepted:0,
+        m:{ bhi:0, cli:0, sdr:0, nov:0, err:0, b1:0, freq:0, wl:610, val:0, ar:0, charge:0, bfield:0 },
+      };
+    }
+
+    setState(patch, cb) {
+      Object.assign(this.state, patch);
+      this._render();
+      if (cb) cb();
+    }
+
+    // ---------- lifecycle ----------
+    mount() {
+      this._cacheDom();
+      this._wireControls();
+      this._loopCanvas();   // start the field animation immediately
+      this._render();       // paint the initial (SIM) frame
+      this._boot();         // then try to load real run data, async
+    }
+    async _boot() {
+      await this._loadData();          // may flip this.mode to 'REPLAY'
+      this.rng = this._mulberry(42);   // re-seed so replay jitter is deterministic
+      this._rowIdx = 0;
+      this.cur = this._makeConcept();  // now honours this.mode
+      this._goToPhase(0);
+      this._schedule();
+      this._render();
+    }
+
+    // ---------- data source (CSV replay) ----------
+    // Loads a real run from ?data=<path>, else the newest known run file.
+    // Falls back to SIM (RNG) if nothing loads — keeps the file openable via
+    // file:// where fetch is blocked.
+    async _loadData() {
+      const params = new URLSearchParams(location.search);
+      const explicit = params.get('data');
+      if (params.get('mode') === 'sim') { this.mode = 'SIM'; this._runName = 'seed 42'; return; }
+      // Probe standard numbered runs newest-first and take the first that
+      // loads with data. Auto-picks the latest run (e.g. run_007 today, run_009
+      // later) and skips the suffixed run_008 parameter-sweep files, which are
+      // a different shape and partly starved. Use ?data=<path> for those.
+      let candidates;
+      if (explicit) {
+        candidates = [explicit];
+      } else {
+        candidates = [];
+        for (let i = 20; i >= 1; i--) candidates.push('data/nhcs_run_' + String(i).padStart(3, '0') + '.csv');
+      }
+      for (const path of candidates) {
+        try {
+          const res = await fetch(path);
+          if (!res.ok) continue;
+          const rows = this._parseCSV(await res.text());
+          if (rows.length) {
+            this._rows = rows; this._rowIdx = 0; this.mode = 'REPLAY';
+            this._runName = path.split('/').pop().replace(/^nhcs_/, '').replace(/\.csv$/, '');
+            return;
+          }
+        } catch (e) { /* try next candidate */ }
+      }
+      this.mode = 'SIM'; this._runName = 'seed 42';
+    }
+    _parseCSV(text) {
+      const lines = text.replace(/\r/g, '').split('\n').filter(l => l.length);
+      if (lines.length < 2) return [];
+      const head = lines[0].split(',');
+      return lines.slice(1).map(line => {
+        const cells = line.split(',');
+        const o = {};
+        head.forEach((h, i) => {
+          const raw = cells[i];
+          const num = raw === '' ? NaN : Number(raw);
+          o[h] = Number.isFinite(num) ? num : raw;
+        });
+        return o;
+      });
+    }
+    _num(r, k, dflt) { const v = r[k]; return (typeof v === 'number' && Number.isFinite(v)) ? v : dflt; }
+    _conceptFromRow(r) {
+      const b0 = this._num(r, 'beta0', 1), b1 = this._num(r, 'beta1', 1), b2 = this._num(r, 'beta2', 0);
+      const betti = [b0, b1, b2];
+      const cs = this._num(r, 'complexity_score', 12);
+      // raw MDL complexity spans many orders of magnitude — log-compress large
+      // values into the ~10-14 band the panels are laid out for.
+      const cmplx = cs > 100 ? Math.log10(cs) * 1.05 : cs;
+      const novelty = this._num(r, 'novelty_aggregate', this._num(r, 'novelty_semantic', 0.6));
+      const freq = this._num(r, 'target_freq_hz', 20);
+      const wl = Math.round(this._num(r, 'target_wl_nm', 610));
+      const arousal = this._clamp((freq - 15) / 24.5, 0, 1);          // inverse of sim mapping
+      const valence = this._clamp((wl - 575) / 150, -0.95, 0.95);
+      const id = (typeof r.concept_id === 'string' && r.concept_id) ? r.concept_id : this._hex(8);
+      const consN = Math.round(this._num(r, 'icvp_n_approve', 0));
+      return {
+        id, novelty, betti, b1, cmplx, arousal, valence, freq, wl,
+        charge: b1,
+        err: this._num(r, 'charge_error_pct', 1.0),
+        visc: (8 + b1 * 1.4).toFixed(1),
+        bfield: this._num(r, 'mean_b_mt', 60),
+        bhi: this._num(r, 'bhi', 0.95),
+        sdr: this._num(r, 'sdr', 0.2),
+        torusP: Math.max(1, Math.round(this._num(r, 'torus_p', 1))),
+        torusQ: Math.max(1, Math.round(this._num(r, 'torus_q', 1))),
+        cliMean: this._num(r, 'cli_mean', 0.13),
+        cliStd: this._num(r, 'cli_std', 0.02),
+        cliMin: this._num(r, 'cli_min', 0.05),
+        cliMax: this._num(r, 'cli_max', 0.4),
+        iisInitial: this._num(r, 'iis_initial', 0.28),
+        iisFinal: this._num(r, 'iis_final', 0.6),
+        icvpEt: this._num(r, 'icvp_mean_et', novelty),
+        icvpAp: this._num(r, 'icvp_mean_ap', 0.6),
+        rejected: this._num(r, 'aian_pass', 1) < 0.5,
+        cli: 0, consN, consApprove: consN / 5 > 0.66,
+      };
+    }
+    _schedule() {
+      if (this._to) clearTimeout(this._to);
+      const spd = this.props.simSpeed != null ? this.props.simSpeed : 1;
+      this._to = setTimeout(() => { this._tick(); this._schedule(); }, 130 / Math.max(0.3, spd));
+    }
+
+    // ---------- prng & helpers ----------
+    _mulberry(a){ return function(){ a|=0;a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+    _hex(n){ let s=''; for(let i=0;i<n;i++) s+=Math.floor(this.rng()*16).toString(16); return s; }
+    _clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+
+    _makeConcept() {
+      if (this.mode === 'REPLAY' && this._rows && this._rows.length) {
+        const row = this._rows[this._rowIdx % this._rows.length];
+        this._rowIdx++;
+        return this._conceptFromRow(row);
+      }
+      const r=this.rng;
+      const novelty=0.52+r()*0.17;
+      const b1=1+Math.floor(r()*4);
+      const b2=r()<0.4?1:0;
+      const betti=[1,b1,b2];
+      const cmplx=10.3+b1*0.78+r()*0.9;
+      const arousal=0.32+r()*0.52;
+      const valence=this._clamp(r()*1.5-0.72,-0.95,0.95);
+      const freq=15+arousal*24.5;
+      const wl=Math.round(this._clamp(575+valence*150,422,718));
+      const charge=b1;
+      const err=0.4+r()*5.4;
+      const visc=(8+r()*6.5).toFixed(1);
+      const bfield=(42+r()*70);
+      const bhi=0.94+r()*0.034;
+      const sdr=this._clamp(0.10+b1*0.072+(novelty-0.5)*0.12+(r()-0.5)*0.04,0.06,0.44);
+      const cliMean=0.118+r()*0.04;
+      const id=this._hex(8);
+      return { id, novelty, betti, b1, cmplx, arousal, valence, freq, wl, charge, err, visc, bfield, bhi, sdr, cliMean,
+               torusP:1, torusQ:1, rejected:false, cli:0, consN:0, consApprove:false };
+    }
+    _blankValidators(){ return [1,2,3,4,5].map(i=>({ did:`did:nhcs:v${i}`, et:'—', ap:'—', vote:'…', col:'var(--faint)' })); }
+
+    _spectrum(wl){
+      const pts=[]; const sig=24;
+      for(let i=0;i<48;i++){ const nm=420+i/47*300; const I=Math.exp(-((nm-wl)*(nm-wl))/(2*sig*sig)); pts.push(I); }
+      return pts;
+    }
+
+    // ---------- simulation ----------
+    _tick(){
+      if(!this.state.running) return;
+      const el=this.state.elapsed+0.13;
+      const ph=this.PHASES[this.state.phaseIdx];
+      if(ph && ph.key==='L3_LOOP'){
+        // accumulate CLI/IIS points
+        const c=this.cur;
+        const prog=this.state.cli.length;
+        let cli, iis;
+        if(this.mode==='REPLAY'){
+          const spread=(c.cliStd!=null?c.cliStd:0.02);
+          const lo=(c.cliMin!=null?c.cliMin:0.05), hi=(c.cliMax!=null?c.cliMax:0.4);
+          cli=this._clamp(c.cliMean+(this.rng()-0.5)*2*spread, lo, hi);
+          const frac=Math.min(1, prog/Math.max(1,this.L3_STEPS-1));
+          iis=this._clamp(c.iisInitial+(c.iisFinal-c.iisInitial)*frac+(this.rng()-0.5)*0.02, 0, 1);
+        } else {
+          cli=this._clamp(c.cliMean+(this.rng()-0.5)*0.03,0.05,0.4);
+          iis=this._clamp(0.28+0.42*(1-Math.exp(-prog/7))+(this.rng()-0.5)*0.04,0,1);
+        }
+        c.cli=cli;
+        const cliA=this.state.cli.concat([cli]).slice(-this.L3_STEPS);
+        const iisA=this.state.iis.concat([iis]).slice(-this.L3_STEPS);
+        this.setState({ elapsed:el, tick:this.state.tick+1, cli:cliA, iis:iisA,
+          m:Object.assign({}, this.state.m, { cli, bfield:c.bfield }) });
+        this._stepInPhase = (this._stepInPhase||0)+1;
+        if(this._stepInPhase>=this.L3_STEPS){ this._stepInPhase=0; this._goNext(); }
+        return;
+      }
+      this.setState({ elapsed:el, tick:this.state.tick+1 });
+      this._dwell=(this._dwell||0)+1;
+      if(this._dwell>=2){ this._dwell=0; this._goNext(); }
+    }
+
+    _goNext(){
+      const cur=this.PHASES[this.state.phaseIdx];
+      let ni=this.state.phaseIdx+1;
+      if(cur && cur.key==='AIAN' && this.cur.rejected){ ni=0; }
+      if(ni>=this.PHASES.length){ ni=0; }
+      this._goToPhase(ni);
+    }
+
+    _goToPhase(idx){
+      const ph=this.PHASES[idx];
+      const patch={ phaseIdx:idx, phaseKey:ph.key, activeLayer:ph.layer, activeMod:ph.mod };
+
+      if(ph.key==='RSE'){
+        this.cur=this._makeConcept(); patch.cur=this.cur;
+        patch.attempts=this.state.attempts+1;
+        patch.cli=[]; patch.iis=[]; this._stepInPhase=0;
+        patch.validators=this._blankValidators(); patch.consN=0; patch.consPct=0; patch.consApprove=false;
+        patch.m=Object.assign({}, this.state.m, { nov:0, sdr:0, bhi:0, b1:this.cur.b1, val:this.cur.valence, ar:this.cur.arousal, charge:this.cur.charge, err:this.cur.err });
+      }
+      if(ph.key==='AIAN'){
+        this.cur.rejected = this.rng()<0.13;
+        patch.m=Object.assign({}, this.state.m, { nov:this.cur.novelty });
+      }
+      if(ph.key==='ICVP'){
+        const c2=this.cur;
+        let vs, n;
+        if(this.mode==='REPLAY'){
+          // real run stores the approve COUNT and mean epistemic/aesthetic
+          // scores, not per-validator votes — reconstruct 5 validators whose
+          // approvals match icvp_n_approve, jittered around the real means.
+          n=this._clamp(c2.consN,0,5);
+          vs=[1,2,3,4,5].map(i=>{
+            const approve=i<=n;
+            const et=this._clamp(c2.icvpEt+(this.rng()-0.5)*0.06,0,1);
+            const ap=this._clamp(c2.icvpAp+(this.rng()-0.5)*0.06,0,1);
+            return { did:`did:nhcs:v${i}`, et:et.toFixed(2), ap:ap.toFixed(2), vote:approve?'APPROVE':'REJECT', col:approve?'var(--gn)':'var(--rd)' };
+          });
+        } else {
+          vs=[1,2,3,4,5].map(i=>{
+            const et=this._clamp(c2.novelty+(this.rng()-0.5)*0.13,0,1);
+            const ap=this._clamp(0.56+this.rng()*0.36,0,1);
+            const approve=(et*0.6+ap*0.4)>0.52 && this.rng()>0.06;
+            return { did:`did:nhcs:v${i}`, et:et.toFixed(2), ap:ap.toFixed(2), vote:approve?'APPROVE':'REJECT', col:approve?'var(--gn)':'var(--rd)' };
+          });
+          n=vs.filter(v=>v.vote==='APPROVE').length;
+          if(n<4){ // bias toward supermajority so pipeline mostly commits
+            for(const v of vs){ if(n>=4) break; if(v.vote==='REJECT'){ v.vote='APPROVE'; v.col='var(--gn)'; v.et=this._clamp(parseFloat(v.et)+0.08,0,1).toFixed(2); n++; } }
+          }
+        }
+        this.cur.consN=n; this.cur.consApprove=n/5>0.66;
+        patch.validators=vs; patch.consN=n; patch.consPct=n/5*100; patch.consApprove=this.cur.consApprove;
+      }
+      if(ph.key==='COMMIT'){
+        const c2=this.cur;
+        const block={ id:c2.id, betti:`β=[${c2.betti.join(',')}]`, cmplx:`χ ${c2.cmplx.toFixed(1)}`,
+          nov:c2.novelty.toFixed(2), sdr:'—', bhi:'—', swatch:this._wlCss(c2.wl) };
+        patch.ledger=[block].concat(this.state.ledger).slice(0,40);
+      }
+      if(ph.key==='L2_PHOT'){
+        const c2=this.cur;
+        patch.spec=this._spectrum(c2.wl);
+        patch.m=Object.assign({}, this.state.m, { wl:c2.wl, freq:c2.freq, err:c2.err, charge:c2.charge, bfield:c2.bfield, val:c2.valence, ar:c2.arousal });
+        // set field target
+        this.field.rgbT=this._wlRGB(c2.wl);
+        this.field.speedT=0.003+c2.freq/40*0.012;
+        this.field.pulseT=12+c2.arousal*16;
+        this.field.rings=Math.max(4,Math.min(10, this.props.fieldRings!=null?this.props.fieldRings:c2.b1+4));
+        this.field.p=c2.torusP||1; this.field.q=c2.torusQ||1;   // Hopf charge (linking number)
+      }
+      if(ph.key==='FEEDBACK'){
+        const c2=this.cur;
+        patch.accepted=this.state.accepted+1;
+        patch.m=Object.assign({}, this.state.m, { bhi:c2.bhi, sdr:c2.sdr });
+        // update ledger row for this concept with final sdr/bhi
+        patch.ledger=this.state.ledger.map(b=> b.id===c2.id ? Object.assign({}, b, {sdr:c2.sdr.toFixed(2), bhi:c2.bhi.toFixed(2)}) : b);
+      }
+
+      // log
+      const layerCol={ L1:'var(--cy)', L2:'var(--bl)', L3:'var(--mg)' }[ph.layer];
+      const e={ t:this._fmtT(this.state.elapsed), tag:ph.layer, col:layerCol, msg:ph.msg(this.cur) };
+      patch.log=[e].concat(this.state.log).slice(0,7);
+
+      this.setState(patch);
+    }
+
+    // ---------- canvas ----------
+    _loopCanvas(){
+      if(this._loopStarted) return;
+      this._loopStarted=true;
+      const draw=()=>{
+        try{
+        const cv=this._cv||document.getElementById('nhcs-field');
+        if(cv) this._cv=cv;
+        if(!cv) return;
+        const dpr=Math.min(2,window.devicePixelRatio||1);
+        const w=cv.clientWidth, h=cv.clientHeight;
+        if(!w||!h) return;
+        if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){ cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr); }
+        const ctx=cv.getContext('2d');
+        ctx.setTransform(dpr,0,0,dpr,0,0);
+        ctx.clearRect(0,0,w,h);
+        const f=this.field;
+        // lerp toward targets
+        for(let i=0;i<3;i++) f.rgb[i]+=(f.rgbT[i]-f.rgb[i])*0.05;
+        f.speed+=(f.speedT-f.speed)*0.05;
+        f.pulse+=(f.pulseT-f.pulse)*0.05;
+        f.rot+=f.speed;
+        const running=this.state.running;
+        if(!running) f.rot-=f.speed*0.85;
+        const cx=w/2, cy=h/2;
+        const t=performance.now()/1000;
+        const scale=Math.min(w,h)/300;
+        const pr=f.rgb[0], pg=f.rgb[1], pb=f.rgb[2];
+
+        // ---- Hopf fibration ----
+        // The fibers of the Hopf map S3->S2 are great circles, and every pair
+        // is linked exactly once (Villarceau circles). We sample fibers over
+        // several latitudes of the base sphere (each latitude => one nested
+        // torus), stereographically project S3->R3, then spin/tilt into view.
+        // (p,q) are the Hopf charge / linking number from torus_p,torus_q.
+        const P=Math.max(1,Math.round(f.p||1)), Q=Math.max(1,Math.round(f.q||1));
+        const spin=f.rot, cS=Math.cos(spin), sS=Math.sin(spin);
+        const tilt=0.62, ct=Math.cos(tilt), st=Math.sin(tilt);
+        const flow=t*0.35;                        // drift along each fiber
+        const breathe=1+0.05*Math.sin(t*2.0);
+        const projScale=(f.pulse*0.9+20)*scale*0.72*breathe;
+        // Latitudes kept below ~2.0 so no fiber approaches the projection pole
+        // (z2im->1); that keeps every stereographic image a genuine round
+        // circle instead of a clamped/flattened polygon.
+        const lats=[0.50,0.86,1.22,1.58,1.94];    // base-sphere latitudes
+        const nLat=Math.max(2,Math.min(lats.length,Math.round(f.rings/2)+1));
+        const fibersPerLat=Math.max(5,Math.min(11,Math.round(f.rings)+1));
+        const seg=84;                             // fine sampling -> smooth arcs
+        const fibers=[];
+        for(let li=0;li<nLat;li++){
+          const alpha=lats[li];
+          const ca=Math.cos(alpha/2), sa=Math.sin(alpha/2);
+          for(let bi=0;bi<fibersPerLat;bi++){
+            const beta=bi/fibersPerLat*Math.PI*2;
+            const pts=[]; let zsum=0;
+            for(let s=0;s<=seg;s++){
+              const tt=s/seg*Math.PI*2+flow;
+              const a1=P*tt, a2=Q*tt+beta;
+              const z1re=ca*Math.cos(a1), z1im=ca*Math.sin(a1);
+              const z2re=sa*Math.cos(a2), z2im=sa*Math.sin(a2);
+              let denom=1-z2im; if(denom<0.14) denom=0.14;   // stereographic S3->R3
+              const X=z1re/denom, Y=z1im/denom, Z=z2re/denom;
+              const x1=X*cS - Z*sS, zR=X*sS + Z*cS;          // spin about Y
+              const y1=Y*ct - zR*st, z2=Y*st + zR*ct;        // tilt about X
+              pts.push([cx+x1*projScale, cy+y1*projScale, z2]);
+              zsum+=z2;
+            }
+            fibers.push({pts, z:zsum/(seg+1), li, beta});
+          }
+        }
+        fibers.sort((a,b)=>a.z-b.z);              // painter's algorithm, back to front
+        for(const fb of fibers){
+          const d=this._clamp((fb.z+5)/10,0,1);
+          const latT=nLat>1?fb.li/(nLat-1):0;
+          const tint=(0.55+d*0.55)*(0.72+0.36*Math.cos(fb.beta+latT*1.4));
+          const rC=Math.round(this._clamp(pr*tint+16,0,255));
+          const gC=Math.round(this._clamp(pg*tint+22,0,255));
+          const bC=Math.round(this._clamp(pb*tint+28,0,255));
+          ctx.beginPath();
+          ctx.moveTo(fb.pts[0][0],fb.pts[0][1]);
+          for(let s=1;s<fb.pts.length;s++) ctx.lineTo(fb.pts[s][0],fb.pts[s][1]);
+          ctx.strokeStyle=`rgba(${rC},${gC},${bC},${0.22+d*0.62})`;
+          ctx.lineWidth=(0.6+d*1.8)*scale;
+          ctx.lineJoin='round';
+          ctx.shadowBlur=d>0.5?6*scale:0;
+          ctx.shadowColor=`rgb(${rC},${gC},${bC})`;
+          ctx.stroke();
+        }
+        ctx.shadowBlur=0;
+        // core glow
+        const g=ctx.createRadialGradient(cx,cy,0,cx,cy,72*scale);
+        g.addColorStop(0,`rgba(${Math.round(pr)},${Math.round(pg)},${Math.round(pb)},0.15)`);
+        g.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,72*scale,0,Math.PI*2); ctx.fill();
+        }catch(e){ /* swallow draw errors */ }
+      };
+      this._fieldTimer=setInterval(draw,33);
+    }
+
+    // ---------- color ----------
+    _wlRGB(w){
+      let R=0,G=0,B=0;
+      if(w<440){R=-(w-440)/(440-380);B=1;}
+      else if(w<490){G=(w-440)/50;B=1;}
+      else if(w<510){G=1;B=-(w-510)/20;}
+      else if(w<580){R=(w-510)/70;G=1;}
+      else if(w<645){R=1;G=-(w-645)/65;}
+      else {R=1;}
+      let f=1; if(w<420)f=0.3+0.7*(w-380)/40; else if(w>700)f=0.3+0.7*(780-w)/80;
+      const g=v=>Math.round(255*Math.pow(Math.max(0,v)*f,0.8));
+      return [Math.max(40,g(R)),Math.max(40,g(G)),Math.max(40,g(B))];
+    }
+    _wlCss(w){ const c=this._wlRGB(w); return `rgb(${c[0]},${c[1]},${c[2]})`; }
+
+    _fmtT(s){ const m=Math.floor(s/60), ss=(s%60); return `${String(m).padStart(2,'0')}:${ss.toFixed(1).padStart(4,'0')}`; }
+
+    // ---------- transport ----------
+    toggle=()=>{ const r=!this.state.running; this.setState({running:r}); if(r) this._schedule(); else if(this._to) clearTimeout(this._to); };
+    step=()=>{ const was=this.state.running; if(was){ this.setState({running:false}); if(this._to) clearTimeout(this._to);} this._goNext(); };
+    reset=()=>{
+      this.rng=this._mulberry(42); this._dwell=0; this._stepInPhase=0; this._rowIdx=0;
+      this.cur=this._makeConcept();
+      this.setState({ tick:0, elapsed:0, cli:[], iis:[], spec:this._spectrum(610),
+        ledger:[], log:[], attempts:0, accepted:0, running:true,
+        validators:this._blankValidators(), consN:0, consPct:0, consApprove:false,
+        m:{ bhi:0, cli:0, sdr:0, nov:0, err:0, b1:0, freq:0, wl:610, val:0, ar:0, charge:0, bfield:0 } },
+        ()=>{ this._goToPhase(0); this._schedule(); });
+    };
+
+    // ---------- render plumbing ----------
+    _ptStr(arr){ if(!arr||!arr.length) return ''; const N=Math.max(arr.length-1,1); return arr.map((v,i)=>`${(i/N*300).toFixed(1)},${(5+(1-v)*90).toFixed(1)}`).join(' '); }
+
+    renderVals(){
+      const s=this.state, m=s.m, c=s.cur, p=this.props;
+      const layerMeta=[
+        { tag:'L1', key:'L1', name:'GENESIS CORE', accent:'var(--cy)', glowCol:'rgba(53,224,207,.22)',
+          mods:[['rse','RSE'],['aian','AIAN'],['beam','BEAM'],['merit','MERIT'],['icvp','ICVP'],['ledger','LEDGER']],
+          stats:[{label:'NOVELTY',value:m.nov?m.nov.toFixed(3):'—',col:'var(--cy)'},{label:'β-PROFILE',value:c?`[${c.betti.join(',')}]`:'—',col:'var(--tx)'},{label:'CMPLX',value:c?c.cmplx.toFixed(1):'—',col:'var(--dim)'}] },
+        { tag:'L2', key:'L2', name:'TMFT BRIDGE', accent:'var(--bl)', glowCol:'rgba(72,198,255,.22)',
+          mods:[['coil','COIL-FIELD'],['llg','LLG'],['qtensor','Q-TENSOR'],['fluid','FLUID'],['phot','PHOTONICS']],
+          stats:[{label:'HOPF Δ',value:m.err?m.err.toFixed(1)+'%':'—',col:'var(--am)'},{label:'FREQ',value:m.freq?m.freq.toFixed(1)+'Hz':'—',col:'var(--bl)'},{label:'λ',value:m.wl?m.wl+'nm':'—',col:'var(--tx)'}] },
+        { tag:'L3', key:'L3', name:'CRIM MODEL', accent:'var(--mg)', glowCol:'rgba(207,144,240,.22)',
+          mods:[['phen','PHEN-SPACE'],['metrics','PRIME-MAP'],['pid','PID'],['airlock','AIRLOCK'],['metrics','METRICS']],
+          stats:[{label:'CLI',value:m.cli?m.cli.toFixed(3):'—',col:'var(--cy)'},{label:'SDR',value:m.sdr?m.sdr.toFixed(3):'—',col:'var(--mg)'},{label:'BHI',value:m.bhi?m.bhi.toFixed(3):'—',col:'var(--gn)'}] },
+      ];
+      const layers=layerMeta.map(L=>{
+        const on=s.activeLayer===L.key;
+        return { tag:L.tag, name:L.name, accent:L.accent, glowCol:L.glowCol, glow:on?1:0,
+          status:on?'● ACTIVE':'STANDBY', statusCol:on?L.accent:'var(--faint)',
+          mods:L.mods.map(kn=>({ name:kn[1], on:(on&&s.activeMod===kn[0])?1:0.16, glow:(on&&s.activeMod===kn[0])?L.accent:'transparent' })),
+          stats:L.stats };
+      });
+
+      const flowTarget=0.6;
+      const kpis=[
+        { label:'BHI', tag:'HOMEO', tagCol:'var(--gn)', value:m.bhi?m.bhi.toFixed(3):'—.—', unit:'', accent:'var(--gn)', barPct:m.bhi*100 },
+        { label:'CLI', tag:'<FLOW', tagCol:'var(--rd)', value:m.cli?m.cli.toFixed(3):'—.—', unit:'/0.60', accent:'var(--cy)', barPct:(m.cli/flowTarget)*100 },
+        { label:'SDR', tag:'SEM-Δ', tagCol:'var(--mg)', value:m.sdr?m.sdr.toFixed(3):'—.—', unit:'', accent:'var(--mg)', barPct:m.sdr*100/0.45 },
+        { label:'NOVELTY', tag:'AIAN', tagCol:'var(--cy)', value:m.nov?m.nov.toFixed(3):'—.—', unit:'', accent:'var(--cy)', barPct:m.nov*100 },
+        { label:'HOPF Δ', tag:'CHARGE', tagCol:'var(--am)', value:m.err?m.err.toFixed(1):'—.—', unit:'%', accent:'var(--am)', barPct:this._clamp(m.err*14,3,100) },
+        { label:'β₁', tag:'LOOPS', tagCol:'var(--bl)', value:m.b1?String(m.b1):'—', unit:'', accent:'var(--bl)', barPct:(m.b1/4)*100 },
+      ];
+
+      const statusLabel=s.running?'RUNNING':'PAUSED';
+      const statusColor=s.running?'var(--gn)':'var(--am)';
+
+      return {
+        scanOpacity: (p.scanlines===false)?0:0.5,
+        statusLabel, statusColor,
+        srcKey: this.mode==='REPLAY' ? 'SOURCE' : 'SEED',
+        srcVal: this.mode==='REPLAY' ? this._runName : '42',
+        srcCol: this.mode==='REPLAY' ? 'var(--bl)' : 'var(--dim)',
+        elapsedStr:this._fmtT(s.elapsed),
+        acceptedStr:String(s.accepted), attemptsStr:String(s.attempts),
+        thrptStr:(s.elapsed>0?(s.accepted/s.elapsed*60).toFixed(1):'0.0')+'/min',
+        toggleLabel:s.running?'❚❚ PAUSE':'▶ RUN',
+        curIdShort: c?c.id.slice(0,8):'—',
+
+        layers,
+        kpis,
+
+        // field overlays
+        chargeStr: m.charge?('+'+m.charge):'—',
+        errStr: m.err?m.err.toFixed(1)+'%':'—',
+        freqStr: m.freq?m.freq.toFixed(1):'—',
+        wlStr: m.wl?String(m.wl):'—',
+        wlCol: this._wlCss(m.wl||610),
+        valStr: (m.val!=null)?(m.val>=0?'+':'')+m.val.toFixed(2):'—',
+        arStr: m.ar?m.ar.toFixed(2):'—',
+        bfieldStr: m.bfield?m.bfield.toFixed(0):'—',
+
+        // charts
+        cliPts:this._ptStr(s.cli),
+        iisPts:this._ptStr(s.iis),
+        specPts:this._ptStr(s.spec),
+        markerLeft:((( m.wl||610)-420)/300*100).toFixed(1),
+        cliNowStr:(s.cli.length?s.cli[s.cli.length-1].toFixed(3):'0.000'),
+        stepsStr:String(s.cli.length),
+
+        // consensus
+        validators:s.validators,
+        consPct:s.consPct,
+        consPctStr:(s.consN)+'/5',
+        consCol:s.consApprove?'var(--gn)':(s.consN?'var(--am)':'var(--faint)'),
+        consLabel:s.consApprove?'COMMIT':(s.consN?'PENDING':'IDLE'),
+
+        // ledger
+        ledger:s.ledger,
+        ledgerCount:String(s.ledger.length),
+
+        // log
+        log:s.log,
+        phaseBanner: s.phaseKey?('PHASE · '+s.phaseKey):'',
+      };
+    }
+
+    // ---------- DOM ----------
+    _cacheDom(){
+      const id=x=>document.getElementById(x);
+      this.$ = {
+        scanline:id('scanline'),
+        statusDot:id('status-dot'), statusLabel:id('status-label'),
+        elapsed:id('elapsed'), committed:id('committed'), attempts:id('attempts'), thrput:id('thrput'),
+        btnToggle:id('btn-toggle'), btnStep:id('btn-step'), btnReset:id('btn-reset'),
+        srcKey:id('src-key'), srcVal:id('src-val'),
+        curId:id('cur-id'), pipeline:id('pipeline'), kpis:id('kpis'),
+        charge:id('charge'), errTop:id('err-top'), freq:id('freq'),
+        wlField:id('wl-field'), valence:id('valence'), arousal:id('arousal'), bfield:id('bfield'),
+        iisLine:id('iis-line'), cliLine:id('cli-line'), cliNow:id('cli-now'), steps:id('steps'),
+        specLine:id('spec-line'), specMarker:id('spec-marker'), wlPeak:id('wl-peak'),
+        consLabel:id('cons-label'), consBar:id('cons-bar'), consPct:id('cons-pct'), validators:id('validators'),
+        ledgerCount:id('ledger-count'), ledger:id('ledger'),
+        phaseBanner:id('phase-banner'), log:id('log'),
+      };
+      this._cv = id('nhcs-field');
+    }
+
+    _wireControls(){
+      this.$.btnToggle.addEventListener('click', this.toggle);
+      this.$.btnStep.addEventListener('click', this.step);
+      this.$.btnReset.addEventListener('click', this.reset);
+    }
+
+    _esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    _pipelineCardHTML(l){
+      const mods=l.mods.map(m=>`
+        <div style="display:flex;align-items:center;gap:5px;padding:3px 7px;border-radius:5px;background:var(--bg2);border:1px solid var(--bd);">
+          <span style="width:6px;height:6px;border-radius:50%;background:${l.accent};opacity:${m.on};box-shadow:0 0 6px ${m.glow};"></span>
+          <span style="font:500 8.5px/1 'IBM Plex Mono';letter-spacing:.04em;color:var(--dim);">${this._esc(m.name)}</span>
+        </div>`).join('');
+      const stats=l.stats.map(s=>`
+        <div style="line-height:1.25;">
+          <div style="font:500 8px/1 'IBM Plex Mono';letter-spacing:.12em;color:var(--faint);">${this._esc(s.label)}</div>
+          <div style="margin-top:3px;font:600 13px/1 'IBM Plex Mono';color:${s.col};">${this._esc(s.value)}</div>
+        </div>`).join('');
+      return `
+      <div style="position:relative;background:var(--bg1);border:1px solid var(--bd);border-radius:9px;padding:11px 12px;overflow:hidden;">
+        <div style="position:absolute;inset:0;border-radius:9px;border:1px solid ${l.accent};box-shadow:inset 0 0 22px ${l.glowCol}, 0 0 16px ${l.glowCol};opacity:${l.glow};pointer-events:none;transition:opacity .25s;"></div>
+        <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:${l.accent};opacity:${l.glow};"></div>
+        <div style="position:relative;display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font:600 9px/1 'IBM Plex Mono';color:${l.accent};padding:3px 5px;border:1px solid ${l.accent};border-radius:4px;opacity:.85;">${this._esc(l.tag)}</span>
+            <span style="font:600 11px/1 'Space Grotesk';letter-spacing:.04em;color:var(--tx);">${this._esc(l.name)}</span>
+          </div>
+          <span style="font:500 8.5px/1 'IBM Plex Mono';letter-spacing:.1em;color:${l.statusCol};">${this._esc(l.status)}</span>
+        </div>
+        <div style="position:relative;display:flex;flex-wrap:wrap;gap:5px;margin-bottom:9px;">${mods}</div>
+        <div style="position:relative;display:flex;gap:14px;padding-top:8px;border-top:1px solid var(--bd);">${stats}</div>
+      </div>`;
+    }
+
+    _kpiHTML(k){
+      return `
+      <div style="position:relative;flex:1 1 108px;min-width:108px;background:var(--bg1);border:1px solid var(--bd);border-radius:8px;padding:7px 10px 8px;overflow:hidden;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font:600 8.5px/1 'IBM Plex Mono';letter-spacing:.12em;color:var(--dim);">${this._esc(k.label)}</span>
+          <span style="font:500 7.5px/1 'IBM Plex Mono';letter-spacing:.06em;color:${k.tagCol};">${this._esc(k.tag)}</span>
+        </div>
+        <div style="margin-top:6px;display:flex;align-items:baseline;gap:3px;">
+          <span style="font:600 21px/1 'IBM Plex Mono';color:${k.accent};letter-spacing:-.01em;">${this._esc(k.value)}</span>
+          <span style="font:500 9px/1 'IBM Plex Mono';color:var(--faint);">${this._esc(k.unit)}</span>
+        </div>
+        <div style="margin-top:7px;height:3px;border-radius:2px;background:var(--bg3);overflow:hidden;">
+          <div style="height:100%;width:${this._clamp(k.barPct||0,0,100)}%;background:${k.accent};box-shadow:0 0 7px ${k.accent};transition:width .3s;"></div>
+        </div>
+      </div>`;
+    }
+
+    _validatorHTML(v){
+      return `
+      <div style="display:flex;align-items:center;gap:9px;padding:5px 8px;border-radius:6px;background:var(--bg2);border:1px solid var(--bd);">
+        <span style="width:7px;height:7px;border-radius:50%;background:${v.col};box-shadow:0 0 6px ${v.col};"></span>
+        <span style="font:500 9px/1 'IBM Plex Mono';color:var(--dim);min-width:74px;">${this._esc(v.did)}</span>
+        <span style="margin-left:auto;font:500 8.5px/1 'IBM Plex Mono';color:var(--faint);">Et ${this._esc(v.et)}</span>
+        <span style="font:500 8.5px/1 'IBM Plex Mono';color:var(--faint);">Ap ${this._esc(v.ap)}</span>
+        <span style="font:600 8.5px/1 'IBM Plex Mono';color:${v.col};min-width:46px;text-align:right;">${this._esc(v.vote)}</span>
+      </div>`;
+    }
+
+    _ledgerRowHTML(b){
+      return `
+      <div style="display:grid;grid-template-columns:16px 1fr 52px 44px 44px;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid #131c28;">
+        <span style="width:11px;height:11px;border-radius:3px;background:${b.swatch};box-shadow:0 0 7px ${b.swatch};"></span>
+        <div style="line-height:1.3;min-width:0;">
+          <div style="font:600 10px/1 'IBM Plex Mono';color:var(--tx);">${this._esc(b.id)}</div>
+          <div style="margin-top:3px;font:500 8px/1 'IBM Plex Mono';color:var(--faint);">${this._esc(b.betti)} · ${this._esc(b.cmplx)}</div>
+        </div>
+        <span style="text-align:right;font:600 10px/1 'IBM Plex Mono';color:var(--cy);">${this._esc(b.nov)}</span>
+        <span style="text-align:right;font:600 10px/1 'IBM Plex Mono';color:var(--mg);">${this._esc(b.sdr)}</span>
+        <span style="text-align:right;font:600 10px/1 'IBM Plex Mono';color:var(--gn);">${this._esc(b.bhi)}</span>
+      </div>`;
+    }
+
+    _logRowHTML(e){
+      return `
+      <div style="display:flex;align-items:baseline;gap:11px;padding:2px 0;font-family:'IBM Plex Mono';">
+        <span style="font-size:9px;color:var(--faint);min-width:54px;">${this._esc(e.t)}</span>
+        <span style="font-size:8.5px;font-weight:600;letter-spacing:.06em;color:${e.col};min-width:30px;">${this._esc(e.tag)}</span>
+        <span style="font-size:10px;color:var(--dim);">${this._esc(e.msg)}</span>
+      </div>`;
+    }
+
+    _render(){
+      if(!this.$) return;
+      const v=this.renderVals(), $=this.$;
+
+      $.scanline.style.opacity=v.scanOpacity;
+
+      $.statusDot.style.background=v.statusColor;
+      $.statusDot.style.boxShadow=`0 0 9px ${v.statusColor}`;
+      $.statusLabel.textContent=v.statusLabel;
+      $.statusLabel.style.color=v.statusColor;
+      $.elapsed.textContent=v.elapsedStr;
+      $.committed.textContent=v.acceptedStr;
+      $.attempts.textContent=v.attemptsStr;
+      $.thrput.textContent=v.thrptStr;
+      $.btnToggle.textContent=v.toggleLabel;
+      $.srcKey.textContent=v.srcKey;
+      $.srcVal.textContent=v.srcVal;
+      $.srcVal.style.color=v.srcCol;
+      $.curId.textContent=v.curIdShort;
+
+      $.pipeline.innerHTML=v.layers.map(l=>this._pipelineCardHTML(l)).join('');
+      $.kpis.innerHTML=v.kpis.map(k=>this._kpiHTML(k)).join('');
+
+      $.charge.textContent=v.chargeStr;
+      $.errTop.textContent=v.errStr;
+      $.freq.textContent=v.freqStr;
+      $.wlField.textContent=v.wlStr;
+      $.wlField.style.color=v.wlCol;
+      $.valence.textContent=v.valStr;
+      $.arousal.textContent=v.arStr;
+      $.bfield.textContent=v.bfieldStr;
+
+      $.iisLine.setAttribute('points',v.iisPts);
+      $.cliLine.setAttribute('points',v.cliPts);
+      $.cliNow.textContent=v.cliNowStr;
+      $.steps.textContent=v.stepsStr;
+
+      $.specLine.setAttribute('points',v.specPts);
+      $.specMarker.style.left=v.markerLeft+'%';
+      $.wlPeak.textContent=v.wlStr;
+
+      $.consLabel.textContent=v.consLabel;
+      $.consLabel.style.color=v.consCol;
+      $.consLabel.style.borderColor=v.consCol;
+      $.consBar.style.width=v.consPct+'%';
+      $.consBar.style.background=v.consCol;
+      $.consBar.style.boxShadow=`0 0 9px ${v.consCol}`;
+      $.consPct.textContent=v.consPctStr;
+      $.validators.innerHTML=v.validators.map(x=>this._validatorHTML(x)).join('');
+
+      $.ledgerCount.textContent=v.ledgerCount;
+      $.ledger.innerHTML=v.ledger.map(b=>this._ledgerRowHTML(b)).join('');
+
+      $.phaseBanner.textContent=v.phaseBanner;
+      $.log.innerHTML=v.log.map(e=>this._logRowHTML(e)).join('');
+    }
+  }
+
+  const app = new NHCSConsole();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => app.mount());
+  } else {
+    app.mount();
+  }
+  window.__nhcs = app;
+})();
+</script>
+</body>
+</html>

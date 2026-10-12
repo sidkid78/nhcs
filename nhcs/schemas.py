@@ -53,6 +53,14 @@ class MeritScores(BaseModel):
     fractal_dimension: float = 0.0
     edge_of_chaos_ratio: float = 0.0
     novelty_score: float = 0.0    # from AIAN
+    # --- merit v2 telemetry (None / defaults on v1 records) ---
+    topo_robustness: float | None = None           # share of b1/b2 features with persistence ratio >= 0.5
+    persistence_ratio_median: float | None = None  # median (death - birth) / cutoff
+    persistence_ratio_min: float | None = None
+    n_reported_features: int = 0                   # b1 + b2 at the cutoff
+    persistence_extend_factor: float | None = None # P censored at this x cutoff (2.0, or 1.5 if too large)
+    persistence_gate: str = "log_only"             # did topo_robustness gate Et?
+    merit_version: str = "v1"
 
 
 # ---------------------------------------------------------------------------

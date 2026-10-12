@@ -85,7 +85,16 @@ class AIAN:
         (semantic, heuristic, aesthetic, embedding). Defaults to
         ``(0.15, 0.25, 0.20, 0.40)``. Need not be normalised — they are
         rescaled to sum to 1.0 so w1..w4 can be tuned independently.
+    gate : "blocking" | "log_only"
+        blocking (default): ``filter`` drops candidates below the threshold.
+        log_only: every candidate passes; novelty is still scored and attached
+        as ``_novelty_score`` so it stays in the ledger/CSV. Use while the heads
+        are uncalibrated for pushout-mode concepts (they reward high-b0 blobs
+        and irregular point clouds, so persistent constructed topology scores
+        ~0.52 vs the 0.6 threshold).
     """
+
+    GATES = ("blocking", "log_only")
 
     DEFAULT_HEAD_WEIGHTS: tuple[float, float, float, float] = (0.15, 0.25, 0.20, 0.40)
 
@@ -94,7 +103,11 @@ class AIAN:
         novelty_threshold: float = 0.6,
         encoder_model: str = "all-MiniLM-L6-v2",
         head_weights: Sequence[float] | None = None,
+        gate: str = "blocking",
     ) -> None:
+        if gate not in self.GATES:
+            raise ValueError(f"gate must be one of {self.GATES}, got {gate!r}")
+        self.gate = gate
         self.novelty_threshold = novelty_threshold
 
         w = np.asarray(head_weights if head_weights is not None
@@ -123,7 +136,21 @@ class AIAN:
     # ── Detection heads ───────────────────────────────────────────────
 
     def _semantic_head(self, betti: list[int], complexity: float) -> float:
-        """Head 1: distance of Betti profile from known human-meaningful shapes."""
+        """Head 1: distance of Betti profile from known human-meaningful shapes.
+
+        NOTE (bias caveat): raw L2 distance rewards large beta_0 monotonically,
+        so high-component blobs ([8,1,0], [9,1,0]) saturate at 1.0 regardless
+        of cycle/void structure. This biases the pipeline toward high-b0 /
+        low-b1 concepts. A per-dimension saturating variant was trialled to
+        debias it, but calibration showed this head's saturated ~1.0 output is
+        load-bearing: the other three heads average only ~0.56, below the 0.6
+        threshold, so deflating this head to realistic mid-range values makes
+        AIAN keep nothing. Debiasing therefore requires re-calibrating the
+        threshold (and/or head weights) in the same change -- not this head in
+        isolation. Left as original pending that combined, separately-tested
+        fix. See DivergentBeamSearch dedup for the diversity issue this was
+        conflated with.
+        """
         b = (betti + [0, 0, 0])[:3]
         human_shapes = [
             [1, 0, 0], [1, 1, 0], [1, 0, 1], [1, 2, 1], [1, 0, 0],
@@ -229,7 +256,9 @@ class AIAN:
         return float(np.clip(score, 0.0, 1.0))
 
     def filter(self, candidates: list[CandidateLike]) -> list[CandidateLike]:
-        """Filter CandidateConcepts to those passing novelty_threshold."""
+        """Filter CandidateConcepts to those passing novelty_threshold.
+
+        In ``log_only`` mode every candidate is returned (still scored)."""
         passed = []
         for c in candidates:
             novelty = self.score(
@@ -239,12 +268,12 @@ class AIAN:
                 c.point_cloud,
             )
             setattr(c, "_novelty_score", novelty)
-            if novelty >= self.novelty_threshold:
+            if novelty >= self.novelty_threshold or self.gate == "log_only":
                 passed.append(c)
             else:
                 logger.debug(
                     "AIAN rejected (novelty=%.3f < threshold=%.3f).",
                     novelty, self.novelty_threshold,
                 )
-        logger.info("AIAN kept %d/%d candidates.", len(passed), len(candidates))
+        logger.info("AIAN kept %d/%d candidates (gate=%s).", len(passed), len(candidates), self.gate)
         return passed

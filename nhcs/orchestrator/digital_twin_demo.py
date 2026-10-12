@@ -55,6 +55,8 @@ async def _run() -> None:
         grid_size=l2["twin"]["grid_size"],
         rse_n_seeds=l1["rse"]["n_seed_complexes"],
         aian_config=l1.get("aian"),
+        icvp_config=l1.get("icvp"),
+        rse_config=l1.get("rse"),
     )
 
     logger.info("=" * 60)

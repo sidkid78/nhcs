@@ -67,30 +67,53 @@ def betti_to_physical(betti: list[int], dimension: int) -> tuple[float, float]:
 
 def crossing_to_torus_knot(crossing_number: int, bridge_index: int) -> tuple[int, int]:
     """
-    Heuristic mapping: (c, b) to (p, q) torus-knot parameters.
+    Heuristic inverse mapping: (c, b) to (p, q) torus-knot parameters.
+
+    For a torus knot T(p, q) with 2 <= p < q and gcd(p, q) = 1:
+      - bridge number  b = p
+      - crossing number c = q * (p - 1)   (Murasugi; min of the two forms)
+    so the inverse is p = b, q = c / (p - 1). For p = 2 this gives q = c
+    exactly (trefoil: c = 3 -> T(2, 3)).
+
+    q is then bumped minimally to enforce q > p and gcd(p, q) = 1 --
+    otherwise T(p, q) is a torus LINK (multiple components), not a knot.
     """
     if crossing_number <= 0:
         return 2, 3  # default: trefoil
     p = max(2, bridge_index)
-    q = max(p + 1, crossing_number // max(p - 1, 1) + 1)
+    q = max(p + 1, round(crossing_number / (p - 1)))
+    while math.gcd(p, q) != 1:
+        q += 1
     return p, q
 
 
 def build_hopf_grid(p: int, q: int, n_points: int = 256) -> np.ndarray:
     """
-    Sample the Hopf fibration H_{p,q} on S3.
+    Sample the (p, q) torus knot on the Clifford torus in S3.
 
-    Returns (n_points, 4) array: (x, y, z, w) quaternion coords.
+    Parametrization (independent phases per complex coordinate):
+        z1 = e^{i p t} / sqrt(2),   z2 = e^{i q t} / sqrt(2)
+    i.e. (x, y, z, w) = (cos pt, sin pt, cos qt, sin qt) / sqrt(2).
+
+    The curve winds p times around one generator of the torus and q times
+    around the other; under the Hopf map it projects to a curve of the
+    correct linking structure. (The previous parametrization shared one
+    phase between z1 and z2 -- z1 = cos(pt) e^{iqt}, z2 = sin(pt) e^{iqt} --
+    whose Hopf image degenerates to a great circle: a spherical Lissajous
+    curve, not a T(p, q) knot. The JS visualizers were already correct.)
+
+    Uses endpoint=False so the closed curve has no duplicated point.
+
+    Returns (n_points, 4) array: (x, y, z, w) quaternion coords on S3.
     """
-    t = np.linspace(0, 2 * math.pi, n_points)
-    phi = p * t
-    psi = q * t
+    t = np.linspace(0, 2 * math.pi, n_points, endpoint=False)
+    inv_sqrt2 = 1.0 / math.sqrt(2.0)
     pts = np.stack([
-        np.cos(phi) * np.cos(psi),
-        np.cos(phi) * np.sin(psi),
-        np.sin(phi) * np.cos(psi),
-        np.sin(phi) * np.sin(psi),
-    ], axis=1)
+        np.cos(p * t),
+        np.sin(p * t),
+        np.cos(q * t),
+        np.sin(q * t),
+    ], axis=1) * inv_sqrt2
     return pts.astype(np.float32)
 
 

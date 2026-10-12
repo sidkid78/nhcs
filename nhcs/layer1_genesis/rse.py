@@ -41,6 +41,8 @@ class CandidateConcept:
     invariant: InvariantProfile
     iteration: int
     rng_seed: int
+    # How the concept was built (pushout mode); None for MRO concepts.
+    construction: dict | None = None
 
 
 class TopologicalProgenitor:
@@ -149,7 +151,20 @@ class InvariantValidator:
 
 
 class RecursiveSynthesisEngine:
-    """Orchestrates Progenitor → MRO loop → Validator → CandidateConcepts."""
+    """
+    Produces CandidateConcepts in one of two modes.
+
+    mode="mro" (default): Progenitor → MRO loop → Validator. Random Gaussian
+        clouds under random linear maps; keeps the iterate with the highest
+        Betti count at the adaptive Rips cutoff. Its loops are mostly
+        short-lived (median persistence ratio ~0.15).
+    mode="pushout": topology built by gluing circles and spheres with the
+        categorical pushout, then realised as a point cloud and verified
+        (see nhcs/layer1_genesis/constructive.py). ``pushout_config`` is passed
+        to PushoutGenerator.
+    """
+
+    MODES = ("mro", "pushout")
 
     def __init__(
         self,
@@ -158,7 +173,12 @@ class RecursiveSynthesisEngine:
         complexity_threshold: float = 0.3,
         persistence_threshold: float = 0.05,
         rng_seed: int = 42,
+        mode: str = "mro",
+        pushout_config: dict | None = None,
     ) -> None:
+        if mode not in self.MODES:
+            raise ValueError(f"mode must be one of {self.MODES}, got {mode!r}")
+        self.mode = mode
         self.rng = np.random.default_rng(rng_seed)
         self.progenitor = TopologicalProgenitor(rng=self.rng)
         self.mro = MorphicRecursiveOperator(rng=self.rng)
@@ -168,8 +188,15 @@ class RecursiveSynthesisEngine:
         )
         self.n_seed_complexes = n_seed_complexes
         self.max_iterations = max_iterations
+        self.constructor = None
+        if mode == "pushout":
+            from nhcs.layer1_genesis.constructive import PushoutGenerator
+            self.constructor = PushoutGenerator(rng=self.rng, **(pushout_config or {}))
 
     def run(self) -> list[CandidateConcept]:
+        if self.constructor is not None:
+            return self.constructor.run(self.n_seed_complexes)
+
         candidates: list[CandidateConcept] = []
 
         for seed_idx in range(self.n_seed_complexes):

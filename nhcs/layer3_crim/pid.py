@@ -73,9 +73,10 @@ class ImmersionIntensityPID:
         iis : float ∈ [0, 1]
         retarget : RetargetRequest | None  (None if no freq adjustment needed)
         """
-        iis = float(self._pid(cli))
-        if iis is None:
-            iis = 0.5  # PID not ready yet
+        # simple-pid returns None until sample_time has elapsed;
+        # float(None) would raise TypeError, so check BEFORE converting.
+        out = self._pid(cli)
+        iis = 0.5 if out is None else float(out)
 
         # Heuristic: map IIS → desired freq within stability regime
         desired_freq = self._freq_min + iis * (self._freq_max - self._freq_min)

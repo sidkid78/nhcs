@@ -70,18 +70,38 @@ RNG_SEED     = 42
 AIAN_CONFIG  = {
     "novelty_threshold": 0.6,
     "head_weights": [0.15, 0.25, 0.20, 0.40],  # [semantic, heuristic, aesthetic, embedding]
+    "gate": "blocking",   # "log_only": score novelty but let every candidate through
+}
+# RSE generator — mirrors the `layer1.rse` block in configs/default.yaml.
+# mode "mro": random clouds + random linear maps (legacy, loops short-lived).
+# mode "pushout": glue circles/spheres via the categorical pushout, verified
+# Betti numbers, persistent loops (nhcs/layer1_genesis/constructive.py).
+RSE_CONFIG   = {
+    "mode": "mro",
+    "pushout": {"n_primitives": [2, 4], "max_glue_points": 3, "sphere_prob": 0.2,
+                "ambient_dim": [3, 5], "spacing": 0.2, "cutoff_factor": 2.0},
+}
+# ICVP validator settings — mirrors the `layer1.icvp` block in configs/default.yaml.
+# persistence_gate: "log_only" records topo_robustness without gating on it;
+# "blocking" makes it count toward Et (most current RSE concepts then fail).
+ICVP_CONFIG  = {
+    "et_threshold": 0.50,
+    "ap_threshold": 0.00,
+    "persistence_gate": "log_only",
 }
 OUT_DIR      = Path("data")
-OUT_CSV      = OUT_DIR / "nhcs_run_001.csv"
-LEDGER_PATH  = str(OUT_DIR / "nhcs_run_001.db")
+OUT_CSV      = OUT_DIR / "nhcs_run_007.csv"
+LEDGER_PATH  = str(OUT_DIR / "nhcs_run_007.db")
 
 CSV_FIELDS = [
-    "run_idx", "concept_id",
+    "run_idx", "concept_id", "rse_mode",
     "beta0", "beta1", "beta2", "euler", "topo_dimension",
     "persistence_entropy", "complexity_score",
     "novelty_semantic", "novelty_heuristic", "novelty_aesthetic", "novelty_embedding",
     "novelty_aggregate", "aian_pass",
     "icvp_n_approve", "icvp_required", "icvp_mean_et", "icvp_mean_ap",
+    "merit_version", "persistence_gate", "mdl_score", "topo_robustness",
+    "persistence_ratio_median", "persistence_ratio_min", "n_reported_features",
     "target_freq_hz", "target_wl_nm", "torus_p", "torus_q",
     "charge_error_pct", "mean_b_mt",
     "prime1", "w1", "prime2", "w2", "prime3", "w3", "prime4", "w4", "prime5", "w5",
@@ -98,16 +118,24 @@ async def collect():
     reset_bus()
 
     logger.info("Initialising pipeline components...")
-    rse        = RecursiveSynthesisEngine(n_seed_complexes=RSE_N_SEEDS, rng_seed=RNG_SEED)
+    rse        = RecursiveSynthesisEngine(
+        n_seed_complexes=RSE_N_SEEDS, rng_seed=RNG_SEED,
+        mode=(RSE_CONFIG or {}).get("mode", "mro"),
+        pushout_config=(RSE_CONFIG or {}).get("pushout"),
+    )
     _aian_kwargs = {
         k: v for k, v in (AIAN_CONFIG or {}).items()
-        if k in ("novelty_threshold", "encoder_model", "head_weights")
+        if k in ("novelty_threshold", "encoder_model", "head_weights", "gate")
     }
     aian       = AIAN(**_aian_kwargs)
     beam       = DivergentBeamSearch(beam_width=3)
-    merit      = MeritEvaluator()
+    _icvp_kwargs = {
+        k: v for k, v in (ICVP_CONFIG or {}).items()
+        if k in ("et_threshold", "ap_threshold", "persistence_gate")
+    }
+    merit      = MeritEvaluator(persistence_gate=_icvp_kwargs.get("persistence_gate", "log_only"))
     slash      = SlashingDetector()
-    validators = [ValidatorNode() for _ in range(N_VALIDATORS)]
+    validators = [ValidatorNode(**_icvp_kwargs) for _ in range(N_VALIDATORS)]
     consensus  = ConsensusProtocol(n_validators=N_VALIDATORS)
     ledger     = GlobalKnowledgeLedger(LEDGER_PATH)
     twin       = DigitalTwin(grid_size=GRID_SIZE)
@@ -163,7 +191,8 @@ async def collect():
         row["novelty_aesthetic"]  = round(s3, 4)
         row["novelty_embedding"]  = round(s4, 4)
         row["novelty_aggregate"]  = round(novelty, 4)
-        row["aian_pass"]          = 1
+        # 1 = would pass the novelty threshold (in log_only mode it is let through either way)
+        row["aian_pass"]          = int(novelty >= aian.novelty_threshold)
 
         s = slash.detect(concept_id="pending", betti=inv.betti)
         if s.tainted:
@@ -178,6 +207,19 @@ async def collect():
         row["icvp_required"]  = summary.get("required", 0)
         row["icvp_mean_et"]   = round(summary.get("mean_et", 0), 4)
         row["icvp_mean_ap"]   = round(summary.get("mean_ap", 0), 4)
+
+        # Merit v2 telemetry (recorded before the approval check)
+        _m = merit.evaluate(best, novelty)
+        row["rse_mode"]                 = rse.mode
+        row["merit_version"]            = _m.merit_version
+        row["persistence_gate"]         = _m.persistence_gate
+        row["mdl_score"]                = round(_m.mdl_score, 4)
+        row["topo_robustness"]          = _m.topo_robustness
+        row["persistence_ratio_median"] = (None if _m.persistence_ratio_median is None
+                                           else round(_m.persistence_ratio_median, 4))
+        row["persistence_ratio_min"]    = (None if _m.persistence_ratio_min is None
+                                           else round(_m.persistence_ratio_min, 4))
+        row["n_reported_features"]      = _m.n_reported_features
 
         if not approved:
             logger.info("Attempt %d: ICVP rejected concept", attempts)
@@ -224,8 +266,8 @@ async def collect():
 
         # Initial prime activation
         field_tensors = realization.field_tensor_array()
-        spatial_3d, temporal, magnitude = phen.project_full(field_tensors)
-        initial_primes = mapper.map(spatial_3d, temporal, magnitude)
+        spatial_3d, temporal, magnitude, variability = phen.project_full(field_tensors)
+        initial_primes = mapper.map(spatial_3d, temporal, magnitude, variability)
 
         for k in range(5):
             if k < len(initial_primes):
@@ -269,7 +311,7 @@ async def collect():
             biometric_homeostasis_index(hrv_series, gsr_series, pupil_series), 4
         )
 
-        final_primes = mapper.map(spatial_3d, temporal, magnitude * iis)
+        final_primes = mapper.map(spatial_3d, temporal, magnitude * iis, variability)
         sdr, sdr_conf = semantic_distance_reduction(
             [(r.prime, r.weight) for r in initial_primes],
             [(r.prime, r.weight) for r in final_primes],

@@ -13,6 +13,17 @@ layer1:
     max_iterations: 500
     complexity_threshold: 0.3
     persistence_threshold: 0.1
+    # mro: random clouds + random linear maps (legacy; loops mostly short-lived).
+    # pushout: glue circles/spheres via the categorical pushout, realise as a
+    # point cloud, verify Betti numbers (nhcs/layer1_genesis/constructive.py).
+    mode: mro
+    pushout:
+      n_primitives: [2, 4]     # primitives glued per concept
+      max_glue_points: 3       # k shared vertices add k-1 extra cycles
+      sphere_prob: 0.2         # chance a primitive is a sphere (adds a 2-void)
+      ambient_dim: [3, 5]
+      spacing: 0.2             # sample spacing, in median edge lengths
+      cutoff_factor: 2.0       # Rips cutoff = cutoff_factor x spacing
   aian:
     novelty_threshold: 0.6   # below this → reject as too human-like
     encoder_model: "all-MiniLM-L6-v2"
@@ -21,11 +32,19 @@ layer1:
     # so w1 (anthropocentric bias) and w2 (linguistic mirroring) proxies can be
     # tuned independently. See nhcs/layer1_genesis/aian.py.
     head_weights: [0.15, 0.25, 0.20, 0.40]
+    # blocking: drop candidates below novelty_threshold.
+    # log_only: score and record novelty, let everything through. The heads
+    # are not calibrated for rse.mode=pushout (constructed concepts score ~0.52).
+    gate: blocking
   icvp:
     n_validators: 5
     supermajority: 0.667
-    et_threshold: 0.50       # read by ValidatorNode
-    ap_threshold: 0.00       # read by ValidatorNode
+    et_threshold: 0.50       # passed to ValidatorNode via EndToEndRunner(icvp_config=...)
+    ap_threshold: 0.00       # passed to ValidatorNode via EndToEndRunner(icvp_config=...)
+    # log_only: record topo_robustness, keep it out of Et (gating unchanged).
+    # blocking: robustness counts toward Et. Most current RSE concepts fail it;
+    # flip only once RSE yields persistent loops (see merit.py docstring).
+    persistence_gate: log_only
 
 layer2:
   twin:

@@ -55,6 +55,18 @@ class TestBettiNumbers:
         profile = compute_betti(pts, max_dimension=1, max_edge_length=0.5)
         assert profile.complexity_score >= 0.0
 
+    def test_isolated_points_count_as_components(self):
+        """Regression: an edgeless complex used to report β0 = 1."""
+        pts = _circle_points(10)          # spacing 0.62 > cutoff 0.5
+        profile = compute_betti(pts, max_dimension=1, max_edge_length=0.5)
+        assert profile.betti == [10, 0]
+
+    def test_loop_without_triangles_is_counted(self):
+        """Regression: a cycle with no 2-simplices used to report β1 = 0."""
+        pts = _circle_points(24)          # only nearest neighbours connect at 0.5
+        profile = compute_betti(pts, max_dimension=2, max_edge_length=0.5)
+        assert profile.betti == [1, 1, 0]
+
     def test_euler_characteristic_consistency(self):
         """χ = β0 - β1 + β2 must match computed value (within stub tolerance)."""
         pts = _circle_points(40)
@@ -66,7 +78,10 @@ class TestBettiNumbers:
 
 class TestComplexityScore:
     def test_more_complex_topology_scores_higher(self):
-        simple = _circle_points(10)
+        # One connected circle vs two. (Previously `simple` was 10 points too far
+        # apart to share an edge; GUDHI skipped H0 for that edgeless complex and
+        # the fallback reported β0 = 1, which is what made this test pass.)
+        simple = _circle_points(40)
         complex_ = np.vstack([_circle_points(40), _circle_points(40, r=2.0) + [5, 0]])
         s1 = compute_betti(simple, max_dimension=1, max_edge_length=0.5)
         s2 = compute_betti(complex_, max_dimension=1, max_edge_length=0.5)

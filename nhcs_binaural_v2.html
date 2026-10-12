@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NHCS Binaural v2 — Session-Locked Phenomenology Logger</title>
+<style>
+  :root{--bg:#07090c;--panel:#0d1117;--edge:#1c2530;--txt:#c9d4de;--dim:#7d8b99;--faint:#4a5663;
+        --cy:#39d5ff;--grn:#4ade80;--amb:#f0c878;--red:#f87171;--vio:#a78bfa;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--txt);font:400 14px/1.55 'Segoe UI',system-ui,sans-serif;padding:18px;max-width:880px;margin:0 auto;}
+  h1{font-size:17px;letter-spacing:.08em;color:var(--cy);margin-bottom:2px;}
+  .sub{font-size:11px;color:var(--faint);letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px;}
+  .warn{border:1px solid rgba(248,113,113,.3);background:rgba(248,113,113,.06);color:#f5b0b0;
+        padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:8px;}
+  .note{border:1px solid rgba(239,159,39,.25);background:rgba(239,159,39,.08);color:var(--amb);
+        padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:8px;}
+  .tabs{display:flex;gap:6px;margin:14px 0 12px;}
+  .tab{flex:1;text-align:center;padding:8px 0;border:1px solid var(--edge);border-radius:6px;cursor:pointer;
+       font-size:11px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;user-select:none;}
+  .tab.on{border-color:var(--cy);color:var(--cy);background:rgba(57,213,255,.06);}
+  .panel{background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:14px;margin-bottom:12px;}
+  .clist{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  @media(max-width:640px){.clist{grid-template-columns:1fr;}}
+  .cc{border:1px solid var(--edge);border-radius:6px;padding:9px 11px;cursor:pointer;position:relative;}
+  .cc.sel{border-color:var(--cy);background:rgba(57,213,255,.05);}
+  .cc .cid{font-family:monospace;font-size:12px;color:var(--cy);}
+  .cc .meta{font-size:11px;color:var(--dim);margin-top:2px;}
+  .cc .fm{font-size:10px;color:var(--vio);margin-top:2px;font-family:monospace;}
+  .wl{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:-1px;margin-right:5px;}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;}
+  button{background:#101822;border:1px solid var(--edge);color:var(--txt);padding:9px 18px;border-radius:6px;
+         cursor:pointer;font-size:13px;letter-spacing:.05em;}
+  button:hover:not(:disabled){border-color:var(--cy);color:var(--cy);}
+  button:disabled{opacity:.35;cursor:not-allowed;}
+  button.primary{border-color:var(--cy);color:var(--cy);}
+  button.commit{border-color:var(--grn);color:var(--grn);}
+  select,input[type=number],textarea{background:#0a0f15;border:1px solid var(--edge);color:var(--txt);
+        padding:7px 9px;border-radius:5px;font-size:13px;}
+  textarea{width:100%;min-height:64px;resize:vertical;font-family:inherit;}
+  .timer{font:600 30px/1 monospace;color:var(--cy);}
+  .lbl{font-size:10px;letter-spacing:.16em;color:var(--faint);text-transform:uppercase;margin:12px 0 5px;}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;}
+  .chip{border:1px solid var(--edge);border-radius:14px;padding:4px 11px;font-size:12px;color:var(--dim);
+        cursor:pointer;user-select:none;}
+  .chip.on{border-color:var(--cy);color:var(--cy);background:rgba(57,213,255,.07);}
+  .chip.prime.on{border-color:var(--vio);color:var(--vio);background:rgba(167,139,250,.08);}
+  .lock{border:1px dashed var(--edge);border-radius:6px;padding:11px;font-size:12.5px;}
+  .lock.active{border-color:var(--grn);border-style:solid;background:rgba(74,222,128,.04);}
+  .lock .sid{font-family:monospace;color:var(--grn);}
+  .slider-row{display:flex;align-items:center;gap:10px;}
+  input[type=range]{flex:1;accent-color:var(--cy);}
+  .val{font-family:monospace;color:var(--cy);width:28px;text-align:right;}
+  .logrec{border:1px solid var(--edge);border-radius:6px;padding:9px 11px;margin-bottom:8px;font-size:12px;}
+  .logrec .hd{display:flex;justify-content:space-between;font-family:monospace;font-size:11.5px;}
+  .badge{font-size:9.5px;padding:2px 7px;border-radius:9px;letter-spacing:.08em;font-family:monospace;}
+  .badge.v2{border:1px solid rgba(74,222,128,.4);color:var(--grn);}
+  .badge.v1{border:1px solid var(--edge);color:var(--faint);}
+  .badge.kept{border:1px solid rgba(240,200,120,.4);color:var(--amb);}
+  .kv{color:var(--dim);}
+  .kv b{color:var(--txt);font-weight:500;}
+  .muted{color:var(--faint);font-size:11.5px;}
+</style>
+</head>
+<body>
+<h1>NHCS BINAURAL · v2</h1>
+<div class="sub">session-locked phenomenology logger · run_007 concepts</div>
+
+<div class="note">ℹ Data integrity note: sessions 2–3 from the prior protocol were discarded due to session/report
+mismatches. Only the verified [7,3,0] session is retained (tagged <span style="font-family:monospace">beltrami-v1</span>).
+As of 2026-07-04 the field-side controller was replaced (spectral / gradient-energy index); all new sessions are tagged
+<span style="font-family:monospace">spectral-v2</span>. <b>Do not pool field-side variables across map versions.</b>
+Audio parameters (TPMM) are unchanged across versions.</div>
+<div class="warn">⚠ Headphones required. Log aftereffects immediately — phenomenological memory decays ~60% within 1 hour.</div>
+
+<div class="tabs">
+  <div class="tab on" data-t="session">Session</div>
+  <div class="tab" data-t="ae">Aftereffect</div>
+  <div class="tab" data-t="log">Log</div>
+</div>
+
+<!-- ══ SESSION TAB ══ -->
+<div id="tab-session">
+  <div class="panel">
+    <div class="lbl">Concept (run_007)</div>
+    <div class="clist" id="clist"></div>
+    <div class="row" style="margin-top:14px;">
+      <span class="lbl" style="margin:0;">Duration</span>
+      <select id="dur">
+        <option value="60">1 min</option>
+        <option value="180">3 min</option>
+        <option value="300" selected>5 min</option>
+        <option value="600">10 min</option>
+      </select>
+      <button id="play" class="primary">▶ Start</button>
+      <button id="stop" disabled>■ Stop</button>
+      <span class="timer" id="timer">0:00</span>
+    </div>
+    <div class="muted" id="sinfo">Select a concept, start a session. Stopping (or completion) locks it for reporting.
+    Sessions under 30 s are discarded, not logged.</div>
+  </div>
+</div>
+
+<!-- ══ AFTEREFFECT TAB ══ -->
+<div id="tab-ae" style="display:none;">
+  <div class="panel">
+    <div class="lbl">Locked session</div>
+    <div class="lock" id="lockbox">No unreported session. Play a session first — it will auto-bind here.</div>
+
+    <div class="lbl">Aftereffect duration (seconds) · 0 = no aftereffect</div>
+    <div class="row"><input type="number" id="ae-dur" min="0" max="3600" value="0" style="width:110px;">
+      <button id="ae-none">None / no aftereffect</button></div>
+
+    <div class="lbl">Intensity <span class="muted">(0 none — 10 overwhelming)</span></div>
+    <div class="slider-row"><input type="range" id="ae-int" min="0" max="10" value="0"><span class="val" id="ae-int-v">0</span></div>
+
+    <div class="lbl">Clarity of recall <span class="muted">(0 vague — 5 vivid)</span></div>
+    <div class="slider-row"><input type="range" id="ae-cla" min="0" max="5" value="3"><span class="val" id="ae-cla-v">3</span></div>
+
+    <div class="lbl">Quality</div>
+    <div class="chips" data-group="quality">
+      <span class="chip">viscous</span><span class="chip">electrical</span><span class="chip">rhythmic</span>
+      <span class="chip">internal</span><span class="chip">resonant</span><span class="chip">pressure</span>
+      <span class="chip">thermal</span><span class="chip">hollow</span><span class="chip">geometric</span>
+    </div>
+
+    <div class="lbl">Modality</div>
+    <div class="chips" data-group="modality">
+      <span class="chip">auditory</span><span class="chip">proprioceptive</span><span class="chip">tactile</span>
+      <span class="chip">visual</span><span class="chip">vestibular</span><span class="chip">mixed</span>
+    </div>
+
+    <div class="lbl">Localization</div>
+    <div class="chips" data-group="localization">
+      <span class="chip">inside-head</span><span class="chip">ears</span><span class="chip">whole-body</span>
+      <span class="chip">limbs</span><span class="chip">chest</span><span class="chip">external</span>
+    </div>
+
+    <div class="lbl">Inferred NSM primes <span class="muted">(what the experience felt like it "said")</span></div>
+    <div class="chips" data-group="primes" id="primechips"></div>
+
+    <div class="lbl">Notes</div>
+    <textarea id="ae-notes" placeholder="free description — write immediately, verbatim inner language"></textarea>
+
+    <div class="row" style="margin-top:12px;">
+      <button id="commit" class="commit" disabled>Commit report</button>
+      <span class="muted" id="delayinfo"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ LOG TAB ══ -->
+<div id="tab-log" style="display:none;">
+  <div class="panel">
+    <div class="row" style="justify-content:space-between;margin-top:0;">
+      <div class="lbl" style="margin:0;">Records <span class="muted" id="lcount"></span></div>
+      <button id="export">Export JSON</button>
+    </div>
+    <div id="loglist" style="margin-top:10px;"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ════════════════════════════════════════════════════════════════════
+// FIELD-MAP VERSIONING
+// The field-side controller was replaced 2026-07-04: the old Beltrami
+// (curl-based) complexity metric measured a numerical boundary artifact
+// (curl B = 0 exactly in the current-free chamber interior); the new
+// spectral controller targets a gradient-energy index
+//   C = <|grad B|^2>/<|B|^2> * L^2
+// solved in closed form over the coil array's eigenvalue spectrum.
+// Sessions carry field_map so datasets can never be silently pooled
+// across regimes. Audio (TPMM) parameters are identical in both.
+// ════════════════════════════════════════════════════════════════════
+const FIELD_MAP_VERSION = 'spectral-v2';
+const LEGACY_FIELD_MAP  = 'beltrami-v1';
+// gs=12 spectral form anchors (see nhcs/layer2_tmft/controller.py)
+const SPEC_C_LO = 5.149, SPEC_C_HI = 68.406, K_C = 4.0;
+const fieldTarget = If => SPEC_C_LO + (SPEC_C_HI - SPEC_C_LO) * If / (K_C + If);
+
+// run_007 concepts (data/nhcs_run_007.csv)
+const CONCEPTS = [
+ {id:'9ea878f9', b:[7,3,0], freq:23.125, wl:604.62, p:7, q:3, primes:['FAR','ABOVE','SOME','BEFORE']},
+ {id:'e573a3ae', b:[7,2,0], freq:17.857, wl:604.62, p:7, q:2, primes:['FAR','SIDE','ABOVE','SOME','NOW']},
+ {id:'9955b3cf', b:[6,3,0], freq:23.125, wl:595.00, p:6, q:3, primes:['FAR','ABOVE','SOME','BEFORE']},
+ {id:'ff7e6940', b:[4,5,0], freq:30.500, wl:570.00, p:4, q:5, primes:['BELOW','SOME','NEAR','AFTER']},
+ {id:'ecae73d4', b:[6,3,0], freq:23.125, wl:595.00, p:6, q:3, primes:['FAR','ABOVE','SOME','BEFORE']},
+ {id:'e7ccd830', b:[4,4,0], freq:27.222, wl:570.00, p:4, q:4, primes:['FAR','MUCH/MANY','BIG','VERY','ABOVE']},
+ {id:'5d263f7c', b:[4,5,0], freq:30.500, wl:570.00, p:4, q:5, primes:['BELOW','SOME','NEAR','AFTER']},
+ {id:'122c6d66', b:[7,2,0], freq:17.857, wl:604.62, p:7, q:2, primes:['FAR','SIDE','ABOVE','SOME','NOW']},
+ {id:'79f2d0d4', b:[6,3,0], freq:23.125, wl:595.00, p:6, q:3, primes:['FAR','ABOVE','SOME','BEFORE']},
+ {id:'b33f2fbe', b:[5,3,0], freq:23.125, wl:583.64, p:5, q:3, primes:['FAR','ABOVE','SOME','BEFORE']},
+];
+const If_of = b => b[1] + 2 * (b[2] || 0);
+
+const NSM_PRIMES = ['I','YOU','BODY','INSIDE','ABOVE','BELOW','FAR','NEAR','SIDE','HERE','TOUCH','FEEL','MOVE',
+ 'HEAR','SEE','THINK','KNOW','MOMENT','WHEN/TIME','NOW','BEFORE','AFTER','MUCH/MANY','SOME','ONE','TWO','BIG',
+ 'SMALL','VERY','MORE','PART','KIND','GOOD','BAD','LIVE','WANT'];
+
+// ── State & persistence ──────────────────────────────────────────────
+const STORE_KEY = 'nhcs_phenlog_v2';
+let store = {log: [], seq: 1};
+let canPersist = true;
+try {
+  const raw = localStorage.getItem(STORE_KEY);
+  if (raw) store = JSON.parse(raw);
+} catch(e){ canPersist = false; }
+function persist(){
+  if(!canPersist) return;
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch(e){ canPersist = false; }
+}
+
+// Seed the single verified session from the original protocol, ONCE.
+// All other prior verbal reports were discarded (session/report mismatches).
+if (store.log.length === 0) {
+  const c = CONCEPTS[0]; // 9ea878f9, β=[7,3,0]
+  const sid = 'S000-KEPT';
+  store.log.push({
+    sid, type:'session', concept_id:c.id, betti:c.b, freq:c.freq, wl:c.wl,
+    duration_s:300, ts:'2026-06-27T18:00:00Z', reported:true,
+    field_map: LEGACY_FIELD_MAP, verified_kept:true
+  });
+  store.log.push({
+    type:'aftereffect', sid, concept_id:c.id, field_map: LEGACY_FIELD_MAP,
+    duration_s:60, delay_s:60, intensity:6, clarity:3,
+    quality:['viscous','rhythmic','internal'],
+    modality:['proprioceptive','mixed'],
+    localization:['inside-head','whole-body'],
+    inferred_primes:['MUCH/MANY','FEEL','TOUCH','MOMENT','WHEN/TIME','MOVE','I','INSIDE','BODY'],
+    intended_primes:c.primes, prime_overlap:0,
+    notes:'like walking in mud; could hear my brain',
+    ts:'2026-06-27T18:06:00Z', verified_kept:true
+  });
+  store.seq = 1;
+  persist();
+}
+
+// ── Wavelength -> css colour ─────────────────────────────────────────
+function wlCss(w){
+  let R=0,G=0,B=0;
+  if(w<440){R=-(w-440)/60;B=1;} else if(w<490){G=(w-440)/50;B=1;}
+  else if(w<510){G=1;B=-(w-510)/20;} else if(w<580){R=(w-510)/70;G=1;}
+  else if(w<645){R=1;G=-(w-645)/65;} else {R=1;}
+  const g=v=>Math.round(255*Math.pow(Math.max(0,v),0.8));
+  return `rgb(${Math.max(40,g(R))},${Math.max(40,g(G))},${Math.max(40,g(B))})`;
+}
+
+// ── Concept list UI ──────────────────────────────────────────────────
+let selIdx = 0;
+const clist = document.getElementById('clist');
+CONCEPTS.forEach((c,i)=>{
+  const If = If_of(c.b), tc = fieldTarget(If);
+  const d = document.createElement('div');
+  d.className = 'cc' + (i===0?' sel':'');
+  d.innerHTML = `<div class="cid">${c.id} · β=[${c.b.join(',')}]</div>
+    <div class="meta"><span class="wl" style="background:${wlCss(c.wl)}"></span>${c.freq.toFixed(2)} Hz · ${c.wl.toFixed(0)} nm · T(${c.p},${c.q})</div>
+    <div class="fm">${FIELD_MAP_VERSION} · I_f=${If} · C→${tc.toFixed(2)} · var=${If}</div>`;
+  d.onclick = ()=>{ if(running) return;
+    document.querySelectorAll('.cc').forEach(x=>x.classList.remove('sel'));
+    d.classList.add('sel'); selIdx = i; };
+  clist.appendChild(d);
+});
+
+// ── Audio engine ─────────────────────────────────────────────────────
+const CARRIER = 200;
+let ac=null, oscL=null, oscR=null, gain=null;
+let running=false, t0=0, tickIv=null, sessionEndTs=null;
+
+function startAudio(freq){
+  ac = new (window.AudioContext||window.webkitAudioContext)();
+  const merger = ac.createChannelMerger(2);
+  gain = ac.createGain(); gain.gain.value = 0;
+  oscL = ac.createOscillator(); oscL.frequency.value = CARRIER;
+  oscR = ac.createOscillator(); oscR.frequency.value = CARRIER + freq;
+  const gL = ac.createGain(), gR = ac.createGain();
+  oscL.connect(gL); gL.connect(merger, 0, 0);   // hard L
+  oscR.connect(gR); gR.connect(merger, 0, 1);   // hard R
+  merger.connect(gain); gain.connect(ac.destination);
+  oscL.start(); oscR.start();
+  gain.gain.linearRampToValueAtTime(0.18, ac.currentTime + 1.2);
+}
+function stopAudio(){
+  if(!ac) return;
+  try{
+    gain.gain.linearRampToValueAtTime(0, ac.currentTime + 0.4);
+    const a = ac;
+    setTimeout(()=>{ try{a.close();}catch(e){} }, 600);
+  }catch(e){}
+  ac=oscL=oscR=gain=null;
+}
+
+const playBtn = document.getElementById('play');
+const stopBtn = document.getElementById('stop');
+const timerEl = document.getElementById('timer');
+const sinfo   = document.getElementById('sinfo');
+
+function fmt(s){ return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`; }
+
+playBtn.onclick = ()=>{
+  if(running) return;
+  if(lockedSid()){ sinfo.textContent = 'Unreported session pending — commit or discard its report before starting a new one.'; return; }
+  const c = CONCEPTS[selIdx];
+  startAudio(c.freq);
+  running = true; t0 = Date.now();
+  playBtn.disabled = true; stopBtn.disabled = false;
+  const durLimit = +document.getElementById('dur').value;
+  sinfo.textContent = `Playing ${c.id} — ${c.freq.toFixed(2)} Hz beat on ${CARRIER} Hz carrier.`;
+  tickIv = setInterval(()=>{
+    const el = (Date.now()-t0)/1000;
+    timerEl.textContent = fmt(el);
+    if(el >= durLimit) endSession();
+  }, 250);
+};
+stopBtn.onclick = ()=> endSession();
+
+function endSession(){
+  if(!running) return;
+  clearInterval(tickIv); stopAudio();
+  running = false; playBtn.disabled = false; stopBtn.disabled = true;
+  const elapsed = Math.round((Date.now()-t0)/1000);
+  timerEl.textContent = '0:00';
+  if(elapsed < 30){
+    sinfo.textContent = `Session ${elapsed}s < 30s — discarded, not logged.`;
+    return;
+  }
+  const c = CONCEPTS[selIdx];
+  const If = If_of(c.b);
+  const sid = 'S' + String(store.seq).padStart(3,'0') + '-' +
+              Math.random().toString(16).slice(2,6).toUpperCase();
+  store.seq++;
+  store.log.push({
+    sid, type:'session', concept_id:c.id, betti:c.b, freq:c.freq, wl:c.wl,
+    duration_s: elapsed, ts:new Date().toISOString(), reported:false,
+    field_map: FIELD_MAP_VERSION,
+    field_target_c: +fieldTarget(If).toFixed(3),
+    field_variant: If
+  });
+  persist();
+  sessionEndTs = Date.now();
+  sinfo.textContent = `Session ${sid} logged (${elapsed}s) and locked for reporting → Aftereffect tab.`;
+  renderLock(); renderLog();
+}
+
+// ── Session lock ─────────────────────────────────────────────────────
+function lockedSession(){
+  // structurally: the single most recent unreported session, or null
+  const s = store.log.filter(r=>r.type==='session' && !r.reported);
+  return s.length ? s[s.length-1] : null;
+}
+function lockedSid(){ const s = lockedSession(); return s ? s.sid : null; }
+
+const lockbox   = document.getElementById('lockbox');
+const commitBtn = document.getElementById('commit');
+const delayinfo = document.getElementById('delayinfo');
+
+function renderLock(){
+  const s = lockedSession();
+  if(!s){
+    lockbox.className = 'lock';
+    lockbox.innerHTML = 'No unreported session. Play a session first — it will auto-bind here.';
+    commitBtn.disabled = true; delayinfo.textContent = '';
+    return;
+  }
+  lockbox.className = 'lock active';
+  lockbox.innerHTML = `<span class="sid">${s.sid}</span> · ${s.concept_id} · β=[${s.betti.join(',')}] ·
+    ${s.freq.toFixed(2)} Hz · ${s.duration_s}s
+    <span class="badge v2" style="margin-left:6px;">${s.field_map}</span>
+    <div class="muted" style="margin-top:3px;">field target C=${s.field_target_c} · variant ${s.field_variant} ·
+    report binds to this session only — no manual selection.</div>`;
+  commitBtn.disabled = false;
+}
+setInterval(()=>{
+  if(lockedSession() && sessionEndTs){
+    delayinfo.textContent = `delay since session end: ${Math.round((Date.now()-sessionEndTs)/1000)}s`;
+  }
+}, 1000);
+
+// ── Chips ────────────────────────────────────────────────────────────
+const primechips = document.getElementById('primechips');
+NSM_PRIMES.forEach(p=>{
+  const s = document.createElement('span');
+  s.className = 'chip prime'; s.textContent = p;
+  primechips.appendChild(s);
+});
+document.querySelectorAll('.chips').forEach(g=>{
+  g.addEventListener('click', e=>{
+    if(e.target.classList.contains('chip')) e.target.classList.toggle('on');
+  });
+});
+function chipVals(group){
+  return [...document.querySelectorAll(`.chips[data-group=${group}] .chip.on`)].map(x=>x.textContent);
+}
+function clearChips(){ document.querySelectorAll('.chip.on').forEach(c=>c.classList.remove('on')); }
+
+// sliders
+const intR = document.getElementById('ae-int'), intV = document.getElementById('ae-int-v');
+const claR = document.getElementById('ae-cla'), claV = document.getElementById('ae-cla-v');
+intR.oninput = ()=> intV.textContent = intR.value;
+claR.oninput = ()=> claV.textContent = claR.value;
+
+document.getElementById('ae-none').onclick = ()=>{
+  document.getElementById('ae-dur').value = 0;
+  intR.value = 0; intV.textContent = '0';
+  clearChips();
+};
+
+// ── Commit (one report per session, then lock clears) ───────────────
+commitBtn.onclick = ()=>{
+  const s = lockedSession();
+  if(!s) return;
+  const inferred = chipVals('primes');
+  const intended = (CONCEPTS.find(c=>c.id===s.concept_id)||{primes:[]}).primes;
+  const overlap = intended.length ?
+    +(inferred.filter(p=>intended.includes(p)).length / intended.length).toFixed(3) : 0;
+  store.log.push({
+    type:'aftereffect', sid:s.sid, concept_id:s.concept_id,
+    field_map:s.field_map,                       // inherited — never re-selected
+    duration_s:+document.getElementById('ae-dur').value || 0,
+    delay_s: sessionEndTs ? Math.round((Date.now()-sessionEndTs)/1000) : null,
+    intensity:+intR.value, clarity:+claR.value,
+    quality:chipVals('quality'), modality:chipVals('modality'),
+    localization:chipVals('localization'),
+    inferred_primes:inferred, intended_primes:intended, prime_overlap:overlap,
+    notes:document.getElementById('ae-notes').value.trim(),
+    ts:new Date().toISOString()
+  });
+  s.reported = true;                             // structural: one report, ever
+  persist();
+  // reset form
+  document.getElementById('ae-dur').value = 0;
+  document.getElementById('ae-notes').value = '';
+  intR.value = 0; intV.textContent='0'; claR.value = 3; claV.textContent='3';
+  clearChips();
+  sessionEndTs = null;
+  renderLock(); renderLog();
+  lockbox.innerHTML += '<div style="color:var(--grn);margin-top:4px;">✓ committed</div>';
+};
+
+// ── Log tab ──────────────────────────────────────────────────────────
+function renderLog(){
+  const el = document.getElementById('loglist');
+  document.getElementById('lcount').textContent =
+    `(${store.log.filter(r=>r.type==='session').length} sessions, ${store.log.filter(r=>r.type==='aftereffect').length} reports)`;
+  el.innerHTML = '';
+  [...store.log].reverse().forEach(r=>{
+    const d = document.createElement('div'); d.className='logrec';
+    const vb = r.field_map === FIELD_MAP_VERSION ? 'v2' : 'v1';
+    const kept = r.verified_kept ? ' <span class="badge kept">verified_kept</span>' : '';
+    if(r.type==='session'){
+      d.innerHTML = `<div class="hd"><span>■ ${r.sid} · ${r.concept_id} · β=[${r.betti.join(',')}]</span>
+        <span><span class="badge ${vb}">${r.field_map}</span>${kept}</span></div>
+        <div class="kv">${r.freq.toFixed(2)} Hz · ${r.duration_s}s ·
+        ${r.field_target_c!==undefined?`C→${r.field_target_c} var=${r.field_variant} · `:''}
+        reported: <b>${r.reported}</b> · ${r.ts}</div>`;
+    } else {
+      d.innerHTML = `<div class="hd"><span>◆ report → ${r.sid}</span>
+        <span><span class="badge ${vb}">${r.field_map}</span>${kept}</span></div>
+        <div class="kv">aftereffect <b>${r.duration_s}s</b> · intensity <b>${r.intensity}</b> ·
+        quality [${(r.quality||[]).join(', ')}] · modality [${(r.modality||[]).join(', ')}] ·
+        prime overlap <b>${r.prime_overlap}</b><br>
+        ${r.notes?`“${r.notes}”`:'<span class="muted">no notes</span>'}</div>`;
+    }
+    el.appendChild(d);
+  });
+}
+
+document.getElementById('export').onclick = ()=>{
+  const blob = new Blob([JSON.stringify({
+    exported: new Date().toISOString(),
+    field_map_current: FIELD_MAP_VERSION,
+    spectral_anchors: {c_lo: SPEC_C_LO, c_hi: SPEC_C_HI, k_c: K_C, grid_size: 12},
+    records: store.log
+  }, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `nhcs_phenlog_${new Date().toISOString().slice(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+};
+
+// ── Tabs ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(t=>{
+  t.onclick = ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+    t.classList.add('on');
+    ['session','ae','log'].forEach(n=>{
+      document.getElementById('tab-'+n).style.display = (t.dataset.t===n)?'':'none';
+    });
+    if(t.dataset.t==='ae') renderLock();
+    if(t.dataset.t==='log') renderLog();
+  };
+});
+
+renderLock(); renderLog();
+</script>
+</body>
+</html>
