@@ -1,7 +1,40 @@
-
-# Gemini Agent
-.gemini-agent/cache/
-
-# Python bytecode cache
+# --- Python ---------------------------------------------------------------
 __pycache__/
 *.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# --- Virtual environments & secrets ---------------------------------------
+.venv/
+venv/
+env/
+.env
+.env.*
+
+# --- Test / tool caches ----------------------------------------------------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# --- Logs & scratch --------------------------------------------------------
+*.log
+.claude_tmp/
+
+# --- Agent / editor local state -------------------------------------------
+.claude/settings.local.json
+.gemini-agent/cache/
+.vscode/
+.idea/
+
+# --- OS --------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Research outputs are deliberately TRACKED: data/*.csv and data/*.db
+# (run CSVs + ICVP ledgers) and renders/*.png (used by rate.py / gallery).
