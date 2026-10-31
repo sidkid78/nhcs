@@ -29,6 +29,8 @@ dependencies = [
     "pylsl>=1.16",
     "simple-pid>=2.0",
     "open3d>=0.18",
+    # Explorer — knot/link invariants (snappy brings spherogram and knot_floer_homology)
+    "snappy>=3.1",
     # Infrastructure
     "pyzmq>=26.0",
     "pyyaml>=6.0",
